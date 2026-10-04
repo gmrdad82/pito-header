@@ -1,0 +1,103 @@
+use ratatui::{buffer::Buffer, layout::Rect, style::Style};
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
+
+pub(crate) const ELLIPSIS: &str = "…";
+
+pub(crate) fn width(text: &str) -> u16 {
+    u16::try_from(text.width()).unwrap_or(u16::MAX)
+}
+
+pub(crate) fn first(text: &str) -> &str {
+    text.graphemes(true).next().unwrap_or("")
+}
+
+pub(crate) fn digits(number: usize, out: &mut [u8; 20]) -> &str {
+    let mut n = number;
+    let mut at = out.len();
+    loop {
+        at -= 1;
+        out[at] = b'0' + (n % 10) as u8;
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    std::str::from_utf8(&out[at..]).unwrap_or("")
+}
+
+pub(crate) fn number_width(number: usize) -> u16 {
+    let mut n = number / 10;
+    let mut count = 1;
+    while n > 0 {
+        n /= 10;
+        count += 1;
+    }
+    count
+}
+
+pub(crate) struct Pen<'a> {
+    buf: &'a mut Buffer,
+    pub(crate) x: u16,
+    y: u16,
+    right: u16,
+}
+
+impl<'a> Pen<'a> {
+    pub(crate) fn new(buf: &'a mut Buffer, area: Rect, x: u16, y: u16) -> Option<Self> {
+        let area = area.intersection(buf.area);
+        if area.is_empty() || y < area.top() || y >= area.bottom() {
+            return None;
+        }
+        Some(Pen {
+            buf,
+            x: x.clamp(area.left(), area.right()),
+            y,
+            right: area.right(),
+        })
+    }
+
+    pub(crate) fn room(&self) -> u16 {
+        self.right.saturating_sub(self.x)
+    }
+
+    pub(crate) fn put(&mut self, text: &str, style: Style) {
+        let room = self.room();
+        if room == 0 || text.is_empty() {
+            return;
+        }
+        let (end, _) = self
+            .buf
+            .set_stringn(self.x, self.y, text, usize::from(room), style);
+        self.x = end;
+    }
+
+    pub(crate) fn clip(&mut self, text: &str, style: Style, room: u16) {
+        let room = room.min(self.room());
+        if width(text) <= room {
+            return self.put(text, style);
+        }
+        if room == 0 {
+            return;
+        }
+        let stop = self.x + room - 1;
+        let (end, _) = self
+            .buf
+            .set_stringn(self.x, self.y, text, usize::from(room - 1), style);
+        self.x = end.min(stop);
+        self.put(ELLIPSIS, style);
+    }
+
+    pub(crate) fn fill(&mut self, symbol: &str, style: Style) {
+        while self.x < self.right {
+            self.buf[(self.x, self.y)]
+                .set_symbol(symbol)
+                .set_style(style);
+            self.x += 1;
+        }
+    }
+
+    pub(crate) fn skip(&mut self, cells: u16) {
+        self.x = self.x.saturating_add(cells).min(self.right);
+    }
+}
