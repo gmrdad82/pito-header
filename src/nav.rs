@@ -430,8 +430,12 @@ struct Label<'a> {
 }
 
 impl Label<'_> {
+    fn shown(&self) -> Option<usize> {
+        self.number.map(|n| if n == 10 { 0 } else { n })
+    }
+
     fn width(&self) -> u16 {
-        let number = self.number.map_or(0, |n| {
+        let number = self.shown().map_or(0, |n| {
             text::number_width(n) + u16::from(!self.text.is_empty())
         });
         2 + number + text::width(self.text)
@@ -440,7 +444,7 @@ impl Label<'_> {
     fn draw(&self, pen: &mut Pen, style: Style, underline: bool) {
         let mut digits = [0; 20];
         pen.put(" ", style);
-        if let Some(number) = self.number {
+        if let Some(number) = self.shown() {
             let number_style = if underline {
                 style.add_modifier(Modifier::UNDERLINED)
             } else {

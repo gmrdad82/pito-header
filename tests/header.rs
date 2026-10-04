@@ -162,6 +162,33 @@ fn one_group_draws_one_row_and_no_groups_draw_none() {
     assert_eq!(draw(header, 21, 1).text, ["───── Dashboard ─────"]);
 }
 
+#[test]
+fn the_tenth_section_draws_its_key_zero() {
+    let names = [
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "Requests", "More",
+    ];
+    let nav = Nav::new(vec![
+        names.iter().fold(Group::new("Main"), |group, name| {
+            group.section(Section::new(*name))
+        }),
+    ]);
+    let bar = NavBar::new(&nav).styles(STYLES);
+    let row = draw(bar, 80, 1).text[0].clone();
+    assert_eq!(
+        row,
+        "        1 A  2 B  3 C  4 D  5 E  6 F  7 G  8 H  9 I  0 Requests  11 More"
+    );
+    let column = u16::try_from(row.find("0 Requests").unwrap()).unwrap();
+    assert_eq!(
+        bar.hit(Rect::new(0, 0, 80, 1), column, 0),
+        Some(Place {
+            group: 0,
+            section: 9,
+            number: 10
+        })
+    );
+}
+
 const TRIAL: [Fact; 2] = [Fact::new("trial: ", GRAY), Fact::new("9 days", MAGENTA)];
 const HELP: [Fact; 2] = [Fact::new("?", MAGENTA), Fact::new(" help", GRAY)];
 

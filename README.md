@@ -7,7 +7,7 @@ terminal UI. It has no app logic and no words of its own: the app passes in
 every name, every style and every key.
 
 ```toml
-pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.2" }
+pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.3" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -16,7 +16,8 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
 ## What it does
 
 - **Groups and numbered sections, as data.** Sections are numbered 1, 2, 3…
-  across all groups, so a digit jumps anywhere; `0` is the tenth.
+  across all groups, so a digit jumps anywhere; `0` is the tenth, and its label
+  draws `0`.
 - **Two nested rows,** the groups over the current group's sections,
   centred, the current one in the accent and bold. When the width runs out
   they abbreviate step by step and never wrap: full names, then each
