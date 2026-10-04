@@ -539,7 +539,7 @@ impl<'a> NavBar<'a> {
         })
     }
 
-    fn rows(&self, area: Rect) -> (Option<Rect>, Option<Rect>) {
+    pub(crate) fn rows(&self, area: Rect) -> (Option<Rect>, Option<Rect>) {
         let line = |y: u16| Rect::new(area.x, y, area.width, 1);
         let sections = self.nav.count() > 0;
         match area.height {
@@ -667,31 +667,39 @@ impl Widget for NavBar<'_> {
 impl Widget for &NavBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let (groups, sections) = self.rows(area);
-        let lit = self.styles.lit();
-        let muted = self.styles.muted;
         if let Some(line) = groups {
-            let (form, start) = self.fit_groups(line);
-            let row = Row {
-                gap: GROUP_GAP,
-                start,
-                on: lit,
-                off: muted,
-                underline: false,
-            };
-            draw_row(buf, line, self.group_labels(form), row);
+            self.draw_groups(buf, line);
         }
         if let Some(line) = sections {
-            let (form, start) = self.fit_sections(line);
-            let on = if self.lit { lit } else { muted };
-            let row = Row {
-                gap: SECTION_GAP,
-                start,
-                on,
-                off: muted,
-                underline: self.underline,
-            };
-            draw_row(buf, line, self.section_labels(form), row);
+            self.draw_sections(buf, line);
         }
+    }
+}
+
+impl NavBar<'_> {
+    pub(crate) fn draw_groups(&self, buf: &mut Buffer, line: Rect) {
+        let (form, start) = self.fit_groups(line);
+        let row = Row {
+            gap: GROUP_GAP,
+            start,
+            on: self.styles.lit(),
+            off: self.styles.muted,
+            underline: false,
+        };
+        draw_row(buf, line, self.group_labels(form), row);
+    }
+
+    fn draw_sections(&self, buf: &mut Buffer, line: Rect) {
+        let (form, start) = self.fit_sections(line);
+        let muted = self.styles.muted;
+        let row = Row {
+            gap: SECTION_GAP,
+            start,
+            on: if self.lit { self.styles.lit() } else { muted },
+            off: muted,
+            underline: self.underline,
+        };
+        draw_row(buf, line, self.section_labels(form), row);
     }
 }
 
@@ -706,6 +714,7 @@ enum Trail {
 pub struct Breadcrumb<'a> {
     nav: &'a Nav,
     styles: Styles,
+    centred: bool,
 }
 
 impl<'a> Breadcrumb<'a> {
@@ -713,11 +722,17 @@ impl<'a> Breadcrumb<'a> {
         Breadcrumb {
             nav,
             styles: Styles::new(),
+            centred: false,
         }
     }
 
     pub fn styles(mut self, styles: Styles) -> Self {
         self.styles = styles;
+        self
+    }
+
+    pub fn centred(mut self, centred: bool) -> Self {
+        self.centred = centred;
         self
     }
 
@@ -789,14 +804,25 @@ impl Widget for &Breadcrumb<'_> {
             pen.fill(RULE, rule);
             return;
         }
-        pen.put(RULE, rule);
-        pen.put(" ", rule);
         let count = self.nav.crumbs().count();
         let trail = [Trail::Whole, Trail::Ends, Trail::Last]
             .into_iter()
             .filter(|trail| *trail != Trail::Ends || count > 2)
             .find(|trail| self.trail_width(*trail) <= room)
             .unwrap_or(Trail::Last);
+        if self.centred {
+            pen.fill(RULE, rule);
+            let block = self.trail_width(trail).min(room) + 2;
+            let start = area.x + (area.width - block) / 2;
+            if let Some(mut pen) = Pen::new(buf, area, start, area.y) {
+                pen.put(" ", rule);
+                self.draw_trail(&mut pen, trail, room, style);
+                pen.put(" ", rule);
+            }
+            return;
+        }
+        pen.put(RULE, rule);
+        pen.put(" ", rule);
         self.draw_trail(&mut pen, trail, room, style);
         pen.put(" ", rule);
         pen.fill(RULE, rule);

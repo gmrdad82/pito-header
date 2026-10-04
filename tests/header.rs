@@ -1,7 +1,7 @@
 mod common;
 
 use common::{STYLES, draw, nav, read, show, widest};
-use pito_header::{Breadcrumb, Fact, Group, Header, Nav, NavBar, Place, Section};
+use pito_header::{Breadcrumb, Drill, Fact, Group, Header, Nav, NavBar, Place, Section};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -43,10 +43,14 @@ fn full<'a>(nav: &'a Nav) -> Header<'a> {
         .underline(true)
 }
 
+fn rows<'a>(nav: &'a Nav) -> Header<'a> {
+    full(nav).drill(Drill::Rows)
+}
+
 #[test]
 fn the_full_header_at_eighty_columns() {
     let nav = deep();
-    let header = full(&nav);
+    let header = rows(&nav);
     assert_eq!(header.height(), 6);
     let drawn = draw(header, 80, 6);
     assert_eq!(
@@ -80,7 +84,7 @@ fn the_full_header_at_eighty_columns() {
 #[test]
 fn narrow_widths_abbreviate_and_never_wrap() {
     let nav = deep();
-    let drawn = draw(full(&nav), 30, 6);
+    let drawn = draw(rows(&nav), 30, 6);
     assert_eq!(
         drawn.text,
         [
@@ -94,7 +98,7 @@ fn narrow_widths_abbreviate_and_never_wrap() {
         "\n{}",
         show(&drawn)
     );
-    let drawn = draw(full(&nav), 16, 6);
+    let drawn = draw(rows(&nav), 16, 6);
     assert_eq!(
         drawn.text,
         [
@@ -114,10 +118,12 @@ fn narrow_widths_abbreviate_and_never_wrap() {
 fn every_width_fits_its_rows() {
     let nav = deep();
     for width in 0..=160 {
-        let header = full(&nav);
-        let drawn = draw(header, width.max(1), header.height());
-        assert!(widest(&drawn) <= usize::from(width.max(1)), "{width}");
-        assert_eq!(drawn.text.len(), 6);
+        for (header, height) in [(rows(&nav), 6), (full(&nav), 4)] {
+            assert_eq!(header.height(), height);
+            let drawn = draw(header, width.max(1), header.height());
+            assert!(widest(&drawn) <= usize::from(width.max(1)), "{width}");
+            assert_eq!(drawn.text.len(), usize::from(height));
+        }
     }
 }
 
@@ -178,7 +184,7 @@ fn rows_are_optional() {
 #[test]
 fn clicks_land_on_the_label_under_them() {
     let nav = deep();
-    let header = full(&nav);
+    let header = rows(&nav);
     let area = Rect::new(0, 0, 80, 7);
     assert_eq!(
         header.hit(area, 30, 1),

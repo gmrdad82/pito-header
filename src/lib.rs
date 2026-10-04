@@ -6,7 +6,7 @@ mod nav;
 mod styles;
 mod text;
 
-pub use header::{Fact, Header};
+pub use header::{Drill, Fact, Header};
 pub use key::Key;
 pub use nav::{Action, Breadcrumb, Group, Nav, NavBar, NavKeys, Place, Section, Step};
 pub use styles::Styles;

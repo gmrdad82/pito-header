@@ -19,6 +19,13 @@ impl<'a> Fact<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Drill {
+    #[default]
+    Replace,
+    Rows,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Header<'a> {
     nav: &'a Nav,
@@ -35,6 +42,7 @@ pub struct Header<'a> {
     crumbs: bool,
     closing: bool,
     notice: Option<Fact<'a>>,
+    drill: Drill,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +72,7 @@ impl<'a> Header<'a> {
             crumbs: false,
             closing: false,
             notice: None,
+            drill: Drill::Replace,
         }
     }
 
@@ -132,17 +141,32 @@ impl<'a> Header<'a> {
         self
     }
 
+    pub fn drill(mut self, drill: Drill) -> Self {
+        self.drill = drill;
+        self
+    }
+
     pub fn height(&self) -> u16 {
+        let replaced = self.replaced();
         u16::from(self.title.is_some())
             + if self.tabs { self.bar().height() } else { 0 }
-            + u16::from(!self.facts.is_empty())
-            + u16::from(self.crumbs)
+            + u16::from(!self.facts.is_empty() && !replaced)
+            + u16::from(self.crumbs && !replaced)
             + u16::from(self.closing)
             + u16::from(self.notice.is_some())
     }
 
     pub fn hit(&self, area: Rect, column: u16, row: u16) -> Option<Place> {
-        self.bar().hit(self.rows(area).tabs?, column, row)
+        let tabs = self.rows(area).tabs?;
+        let bar = self.bar();
+        if self.replaced() && bar.rows(tabs).1.is_some_and(|line| line.y == row) {
+            return None;
+        }
+        bar.hit(tabs, column, row)
+    }
+
+    fn replaced(&self) -> bool {
+        self.drill == Drill::Replace && self.tabs && self.nav.depth() > 0
     }
 
     fn bar(&self) -> NavBar<'a> {
@@ -166,8 +190,8 @@ impl<'a> Header<'a> {
         Rows {
             title: take(self.title.is_some(), 1),
             tabs: take(self.tabs, self.bar().height()),
-            facts: take(!self.facts.is_empty(), 1),
-            crumbs: take(self.crumbs, 1),
+            facts: take(!self.facts.is_empty() && !self.replaced(), 1),
+            crumbs: take(self.crumbs && !self.replaced(), 1),
             closing: take(self.closing, 1),
             notice: take(self.notice.is_some(), 1),
         }
@@ -205,6 +229,23 @@ impl<'a> Header<'a> {
                 pen.clip(right.text, right.style, wide - 2);
                 pen.put(" ", right.style);
             }
+        }
+    }
+
+    fn draw_tabs(&self, buf: &mut Buffer, tabs: Rect) {
+        let bar = self.bar();
+        if !self.replaced() {
+            return bar.render(tabs, buf);
+        }
+        let (groups, sections) = bar.rows(tabs);
+        if let Some(line) = groups {
+            bar.draw_groups(buf, line);
+        }
+        if let Some(line) = sections {
+            Breadcrumb::new(self.nav)
+                .styles(self.styles)
+                .centred(true)
+                .render(line, buf);
         }
     }
 
@@ -273,7 +314,7 @@ impl Widget for &Header<'_> {
             self.draw_title(buf, line, title);
         }
         if let Some(tabs) = rows.tabs {
-            self.bar().render(tabs, buf);
+            self.draw_tabs(buf, tabs);
         }
         if let Some(line) = rows.facts {
             self.draw_facts(buf, line);
