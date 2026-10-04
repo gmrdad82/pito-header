@@ -98,6 +98,7 @@ pub enum Action {
     PrevSection,
     Go(usize),
     Back,
+    Swallow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +109,7 @@ pub struct NavKeys {
     pub prev_section: &'static [Key],
     pub back: &'static [Key],
     pub digits: bool,
+    pub swallow_digits: bool,
 }
 
 impl NavKeys {
@@ -118,6 +120,7 @@ impl NavKeys {
         prev_section: &[Key::Char('[')],
         back: &[Key::Esc, Key::Char('q')],
         digits: true,
+        swallow_digits: false,
     };
 
     pub const NONE: NavKeys = NavKeys {
@@ -127,6 +130,7 @@ impl NavKeys {
         prev_section: &[],
         back: &[],
         digits: false,
+        swallow_digits: false,
     };
 }
 
@@ -140,6 +144,7 @@ impl Default for NavKeys {
 pub enum Step {
     Moved(Place),
     Back { selected: usize },
+    Swallowed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -197,6 +202,11 @@ impl Nav {
                 0
             },
         }
+    }
+
+    pub fn selected(&self, group: usize) -> Option<usize> {
+        let section = *self.last.get(group)?;
+        (section < self.groups[group].sections.len()).then_some(section)
     }
 
     pub fn section(&self) -> Option<&Section> {
@@ -345,6 +355,9 @@ impl Nav {
             }
         };
         match action {
+            Action::Go(number) if number > self.count() && keys.swallow_digits => {
+                Some(Action::Swallow)
+            }
             Action::Go(number) if number > self.count() => None,
             Action::NextSection | Action::PrevSection if self.count() == 0 => None,
             action => Some(action),
@@ -359,6 +372,7 @@ impl Nav {
             Action::PrevSection => self.step(-1),
             Action::Go(number) => self.go(number),
             Action::Back => return self.back().map(|selected| Step::Back { selected }),
+            Action::Swallow => return Some(Step::Swallowed),
         };
         moved.map(Step::Moved)
     }
@@ -811,17 +825,11 @@ impl Widget for &Breadcrumb<'_> {
             .find(|trail| self.trail_width(*trail) <= room)
             .unwrap_or(Trail::Last);
         if self.centred {
-            pen.fill(RULE, rule);
             let block = self.trail_width(trail).min(room) + 2;
-            let start = area.x + (area.width - block) / 2;
-            if let Some(mut pen) = Pen::new(buf, area, start, area.y) {
-                pen.put(" ", rule);
-                self.draw_trail(&mut pen, trail, room, style);
-                pen.put(" ", rule);
-            }
-            return;
+            pen.fill_to(area.x + (area.width - block) / 2, RULE, rule);
+        } else {
+            pen.put(RULE, rule);
         }
-        pen.put(RULE, rule);
         pen.put(" ", rule);
         self.draw_trail(&mut pen, trail, room, style);
         pen.put(" ", rule);

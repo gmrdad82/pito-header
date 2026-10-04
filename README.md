@@ -7,7 +7,7 @@ terminal UI. It has no app logic and no words of its own: the app passes in
 every name, every style and every key.
 
 ```toml
-pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.1" }
+pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.2" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -34,12 +34,26 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
   nothing), so `tab`, `[ ]`, digits or `q` can keep other meanings in an app.
   Back at the top level is never an action, so `esc` stays the app's there.
   With a single group, `tab` steps sections.
+- **Digits past the last section** do nothing and fall through to the app,
+  unless `swallow_digits` is on: then they map to `Action::Swallow`, which
+  `apply` answers with `Step::Swallowed`, so the key is taken and nothing
+  moves. Off by default, and only while `digits` is on.
+- **Every group remembers its section:** `selected(group)` reads it from
+  anywhere, so the app can jump to a group at its remembered section with
+  `go_to(group, section)`, or show another group's section.
 - **A header with no sections** (a dashboard) draws only the rows it's given.
 - **Optional rows** in `Header`: a title rule with the name in the middle
   and a left and a right slot (they drop when there's no room), the nav
   rows, a facts row (each fact styled by the app, on a rule or plain), the
   breadcrumb rule, a closing rule, and a notice row (a result, a warning, or
-  a confirm question).
+  a confirm question). Text on a rule (the title, its slots, the facts, the
+  breadcrumb) carries exactly its own style: the rule's modifiers, such as
+  DIM, never leak into it.
+- **A slot in several styles:** `left_parts` and `right_parts` take a
+  slice of facts drawn side by side, such as a muted label and an accent
+  value; when the slot is cut, the ellipsis takes the style of the part it
+  cuts. The last call of `left`/`left_parts` (or `right`/`right_parts`)
+  wins.
 - **Clicks:** `hit(area, column, row)` names the group or section under the
   pointer; the crate never reads the mouse itself.
 - **Widths by cell:** Unicode widths throughout, so diacritics (ă, î, ș, ț),
@@ -58,19 +72,22 @@ Section::new(name).short(short)
 Group::new(name).short(short).section(section)
 Nav::new(groups).keys(NavKeys)
   place() -> Place { group, section, number }          // number is 1-based, 0 when empty
+  selected(group) -> Option<usize>                     // the section a group remembers
   section(), count(), go(number), go_to(group, section), cycle(by), step(by)
   open(title, selected), back() -> Option<usize>, close() -> Option<usize>
   depth(), title(), crumbs(), breadcrumb() -> String
   action(Key) -> Option<Action>, apply(Action) -> Option<Step>, key(Key) -> Option<Step>
-pub enum Action { NextGroup, PrevGroup, NextSection, PrevSection, Go(usize), Back }
-pub enum Step { Moved(Place), Back { selected } }
-NavKeys { next_group, prev_group, next_section, prev_section, back: &'static [Key], digits }
+pub enum Action { NextGroup, PrevGroup, NextSection, PrevSection, Go(usize), Back, Swallow }
+pub enum Step { Moved(Place), Back { selected }, Swallowed }
+NavKeys { next_group, prev_group, next_section, prev_section, back: &'static [Key], digits,
+          swallow_digits }                             // digits past the last section are taken
   NavKeys::HEY: tab / backtab, ] / [, digits, esc / q          NavKeys::NONE
 NavBar::new(&nav).styles(..).lit(bool).groups(bool).underline(bool); height(), hit(..)
 Breadcrumb::new(&nav).styles(..).centred(bool)
 Fact::new(text, style)
 pub enum Drill { Replace, Rows }                       // Replace by default
 Header::new(&nav).styles(..).title(..).left(..).right(..).tabs(bool).lit(bool)
+  .left_parts(&[Fact]).right_parts(&[Fact])           // a slot in several styles
   .underline(bool).facts(&[Fact]).facts_rule(bool).separator(..).crumbs(bool)
   .closing(bool).notice(Option<Fact>).drill(Drill); height(), hit(..)
 ```
@@ -130,6 +147,7 @@ fn key(nav: &mut Nav, key: Key, selected: &mut usize) {
     match nav.key(key) {
         Some(Step::Back { selected: kept }) => *selected = kept,
         Some(Step::Moved(_)) => *selected = 0,
+        Some(Step::Swallowed) => {}
         None if key == Key::Enter => nav.open(format!("item {selected}"), *selected),
         None => {}
     }

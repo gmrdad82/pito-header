@@ -162,6 +162,76 @@ fn one_group_draws_one_row_and_no_groups_draw_none() {
     assert_eq!(draw(header, 21, 1).text, ["───── Dashboard ─────"]);
 }
 
+const TRIAL: [Fact; 2] = [Fact::new("trial: ", GRAY), Fact::new("9 days", MAGENTA)];
+const HELP: [Fact; 2] = [Fact::new("?", MAGENTA), Fact::new(" help", GRAY)];
+
+fn slots<'a>(nav: &'a Nav) -> Header<'a> {
+    Header::new(nav)
+        .styles(STYLES)
+        .tabs(false)
+        .title(Some("Desk"))
+        .left_parts(&HELP)
+        .right_parts(&TRIAL)
+}
+
+#[test]
+fn the_title_slots_take_several_styled_parts() {
+    let nav = nav();
+    let drawn = draw(slots(&nav), 50, 1);
+    assert_eq!(
+        drawn.text,
+        ["─ ? help ───────────── Desk ────── trial: 9 days ─"],
+        "\n{}",
+        show(&drawn)
+    );
+    assert_eq!(
+        drawn.marks,
+        ["raammmmmmrrrrrrrrrrrrrAAAAAArrrrrrmmmmmmmmaaaaaaar"],
+        "\n{}",
+        show(&drawn)
+    );
+}
+
+#[test]
+fn several_parts_clip_with_the_ellipsis_in_the_cut_part() {
+    let nav = nav();
+    let drawn = draw(slots(&nav), 34, 1);
+    assert_eq!(
+        drawn.text,
+        ["─ ? help ───── Desk ─ trial: 9 … ─"],
+        "\n{}",
+        show(&drawn)
+    );
+    assert_eq!(
+        drawn.marks,
+        ["raammmmmmrrrrrAAAAAArmmmmmmmmaaaar"],
+        "\n{}",
+        show(&drawn)
+    );
+    let cut = [Fact::new("ab界", GRAY), Fact::new("c", MAGENTA)];
+    let header = Header::new(&nav)
+        .styles(STYLES)
+        .tabs(false)
+        .title(Some("Desk"))
+        .right_parts(&cut);
+    assert_eq!(draw(header, 22, 1).text, ["──────── Desk ─ ab… ──"]);
+}
+
+#[test]
+fn empty_parts_and_the_single_fact_replace_each_other() {
+    let nav = nav();
+    let blank = [Fact::new("", GRAY)];
+    let none = Header::new(&nav)
+        .styles(STYLES)
+        .tabs(false)
+        .title(Some("Desk"))
+        .left_parts(&[])
+        .right_parts(&blank);
+    assert_eq!(draw(none, 30, 1).text, ["──────────── Desk ────────────"]);
+    let single = slots(&nav).right(Some(Fact::new("trial", GRAY))).left(None);
+    assert_eq!(draw(single, 30, 1).text, ["──────────── Desk ──── trial ─"]);
+}
+
 #[test]
 fn rows_are_optional() {
     let nav = deep();

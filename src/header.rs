@@ -20,6 +20,28 @@ impl<'a> Fact<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum Slot<'a> {
+    #[default]
+    Empty,
+    One(Fact<'a>),
+    Parts(&'a [Fact<'a>]),
+}
+
+impl<'a> Slot<'a> {
+    fn parts(&self) -> &[Fact<'a>] {
+        match self {
+            Slot::Empty => &[],
+            Slot::One(fact) => std::slice::from_ref(fact),
+            Slot::Parts(parts) => parts,
+        }
+    }
+
+    fn width(&self) -> u16 {
+        parts_width(self.parts())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Drill {
     #[default]
     Replace,
@@ -31,8 +53,8 @@ pub struct Header<'a> {
     nav: &'a Nav,
     styles: Styles,
     title: Option<&'a str>,
-    left: Option<Fact<'a>>,
-    right: Option<Fact<'a>>,
+    left: Slot<'a>,
+    right: Slot<'a>,
     tabs: bool,
     lit: bool,
     underline: bool,
@@ -61,8 +83,8 @@ impl<'a> Header<'a> {
             nav,
             styles: Styles::new(),
             title: None,
-            left: None,
-            right: None,
+            left: Slot::Empty,
+            right: Slot::Empty,
             tabs: true,
             lit: true,
             underline: false,
@@ -87,12 +109,22 @@ impl<'a> Header<'a> {
     }
 
     pub fn left(mut self, left: Option<Fact<'a>>) -> Self {
-        self.left = left.filter(|fact| !fact.text.is_empty());
+        self.left = slot(left.map_or(Slot::Empty, Slot::One));
         self
     }
 
     pub fn right(mut self, right: Option<Fact<'a>>) -> Self {
-        self.right = right.filter(|fact| !fact.text.is_empty());
+        self.right = slot(right.map_or(Slot::Empty, Slot::One));
+        self
+    }
+
+    pub fn left_parts(mut self, parts: &'a [Fact<'a>]) -> Self {
+        self.left = slot(Slot::Parts(parts));
+        self
+    }
+
+    pub fn right_parts(mut self, parts: &'a [Fact<'a>]) -> Self {
+        self.right = slot(Slot::Parts(parts));
         self
     }
 
@@ -201,35 +233,24 @@ impl<'a> Header<'a> {
         let Some(mut pen) = Pen::new(buf, line, line.x, line.y) else {
             return;
         };
-        pen.fill(RULE, self.styles.rule);
+        let rule = self.styles.rule;
         let lit = self.styles.lit();
         let wide = text::width(title).saturating_add(2).min(line.width);
         let start = line.x + (line.width - wide) / 2;
-        if let Some(mut pen) = Pen::new(buf, line, start, line.y) {
-            pen.put(" ", lit);
-            pen.clip(title, lit, wide.saturating_sub(2));
-            pen.put(" ", lit);
-        }
         let side = start.saturating_sub(line.x).saturating_sub(2);
-        if side < SIDE_MIN {
-            return;
+        let sides = side >= SIDE_MIN;
+        if sides && self.left != Slot::Empty {
+            pen.fill_to(line.x + 1, RULE, rule);
+            label(&mut pen, self.left.parts(), side - 2);
         }
-        if let Some(left) = self.left
-            && let Some(mut pen) = Pen::new(buf, line, line.x + 1, line.y)
-        {
-            pen.put(" ", left.style);
-            pen.clip(left.text, left.style, side - 2);
-            pen.put(" ", left.style);
+        pen.fill_to(start, RULE, rule);
+        label(&mut pen, &[Fact::new(title, lit)], wide.saturating_sub(2));
+        if sides && self.right != Slot::Empty {
+            let wide = self.right.width().min(side - 2) + 2;
+            pen.fill_to(line.right().saturating_sub(1 + wide), RULE, rule);
+            label(&mut pen, self.right.parts(), wide - 2);
         }
-        if let Some(right) = self.right {
-            let wide = text::width(right.text).min(side - 2) + 2;
-            let x = line.right().saturating_sub(1 + wide);
-            if let Some(mut pen) = Pen::new(buf, line, x, line.y) {
-                pen.put(" ", right.style);
-                pen.clip(right.text, right.style, wide - 2);
-                pen.put(" ", right.style);
-            }
-        }
+        pen.fill(RULE, rule);
     }
 
     fn draw_tabs(&self, buf: &mut Buffer, tabs: Rect) {
@@ -250,11 +271,6 @@ impl<'a> Header<'a> {
     }
 
     fn draw_facts(&self, buf: &mut Buffer, line: Rect) {
-        if self.facts_rule
-            && let Some(mut pen) = Pen::new(buf, line, line.x, line.y)
-        {
-            pen.fill(RULE, self.styles.rule);
-        }
         let pad = if self.facts_rule { 1 } else { 0 };
         let separator = text::width(self.separator);
         let inner = self
@@ -270,9 +286,15 @@ impl<'a> Header<'a> {
         let shown = inner.min(line.width.saturating_sub(4 * pad));
         let block = shown + 2 * pad;
         let start = line.x + line.width.saturating_sub(block) / 2;
-        let Some(mut pen) = Pen::new(buf, line, start, line.y) else {
+        let rule = self.styles.rule;
+        let Some(mut pen) = Pen::new(buf, line, line.x, line.y) else {
             return;
         };
+        if self.facts_rule {
+            pen.fill_to(start, RULE, rule);
+        } else {
+            pen.skip(start - line.x);
+        }
         let muted = self.styles.muted;
         if pad > 0 {
             pen.put(" ", muted);
@@ -290,6 +312,7 @@ impl<'a> Header<'a> {
         }
         if pad > 0 {
             pen.put(" ", muted);
+            pen.fill(RULE, rule);
         }
     }
 
@@ -299,6 +322,45 @@ impl<'a> Header<'a> {
             pen.clip(notice.text, notice.style, room);
         }
     }
+}
+
+fn slot(slot: Slot) -> Slot {
+    if slot.width() == 0 { Slot::Empty } else { slot }
+}
+
+fn parts_width(parts: &[Fact]) -> u16 {
+    parts.iter().fold(0u16, |total, part| {
+        total.saturating_add(text::width(part.text))
+    })
+}
+
+fn label(pen: &mut Pen, parts: &[Fact], room: u16) {
+    let (Some(first), Some(last)) = (parts.first(), parts.last()) else {
+        return;
+    };
+    pen.put(" ", first.style);
+    if parts_width(parts) <= room {
+        for part in parts {
+            pen.put(part.text, part.style);
+        }
+    } else if room > 0 {
+        let stop = pen.x.saturating_add(room - 1);
+        let mut style = first.style;
+        for part in parts {
+            if pen.x >= stop {
+                break;
+            }
+            style = part.style;
+            let start = pen.x;
+            pen.putn(part.text, part.style, stop - pen.x);
+            if pen.x - start < text::width(part.text) {
+                break;
+            }
+        }
+        pen.x = pen.x.min(stop);
+        pen.put(ELLIPSIS, style);
+    }
+    pen.put(" ", last.style);
 }
 
 impl Widget for Header<'_> {

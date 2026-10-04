@@ -38,6 +38,60 @@ fn a_digit_past_the_last_section_does_nothing() {
 }
 
 #[test]
+fn a_digit_past_the_last_section_is_swallowed_on_request() {
+    let mut nav = nav().keys(NavKeys {
+        swallow_digits: true,
+        ..NavKeys::HEY
+    });
+    nav.go(4);
+    for digit in ['0', '1'] {
+        let past = digit == '0';
+        let action = nav.action(Key::Char(digit));
+        assert_eq!(action == Some(Action::Swallow), past, "{digit}");
+    }
+    assert_eq!(nav.key(Key::Char('0')), Some(Step::Swallowed));
+    assert_eq!(nav.apply(Action::Swallow), Some(Step::Swallowed));
+    assert_eq!(nav.place(), place(1, 0, 4));
+    assert_eq!(nav.key(Key::Char('9')), Some(Step::Moved(place(2, 2, 9))));
+    assert_eq!(nav.action(Key::Char('x')), None);
+}
+
+#[test]
+fn swallowing_needs_the_digits() {
+    let nav = nav().keys(NavKeys {
+        digits: false,
+        swallow_digits: true,
+        ..NavKeys::HEY
+    });
+    assert_eq!(nav.action(Key::Char('0')), None);
+    assert_eq!(nav.action(Key::Char('1')), None);
+    let defaults = [NavKeys::HEY, NavKeys::NONE, NavKeys::default()];
+    assert!(defaults.iter().all(|keys| !keys.swallow_digits));
+}
+
+#[test]
+fn every_group_remembers_its_section() {
+    let mut nav = nav();
+    assert_eq!(nav.selected(0), Some(0));
+    assert_eq!(nav.selected(2), Some(0));
+    nav.go(8);
+    nav.go(5);
+    assert_eq!(nav.selected(2), Some(1));
+    assert_eq!(nav.selected(1), Some(1));
+    assert_eq!(nav.selected(0), Some(0));
+    assert_eq!(nav.selected(3), None);
+    let section = nav.selected(2).unwrap();
+    assert_eq!(nav.go_to(2, section), Some(place(2, 1, 8)));
+    let mut empty = Nav::new(vec![
+        Group::new("Empty"),
+        Group::new("Mail").section(Section::new("Inbox")),
+    ]);
+    assert_eq!(empty.selected(0), None);
+    assert_eq!(empty.selected(1), Some(0));
+    assert_eq!(empty.go(1), Some(place(1, 0, 1)));
+}
+
+#[test]
 fn zero_is_the_tenth_section() {
     let mut nav = Nav::new(vec![(1..=10).fold(Group::new("All"), |group, n| {
         group.section(Section::new(format!("S{n}")))
@@ -123,6 +177,7 @@ fn keys_are_configurable_and_never_taken_without_a_match() {
         prev_section: &[Key::Up],
         back: &[Key::Esc, Key::Char('q'), Key::Char('Q'), Key::Backspace],
         digits: false,
+        swallow_digits: false,
     };
     let mut nav = nav().keys(KEYS);
     assert_eq!(nav.action(Key::Tab), None);

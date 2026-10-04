@@ -62,7 +62,11 @@ impl<'a> Pen<'a> {
     }
 
     pub(crate) fn put(&mut self, text: &str, style: Style) {
-        let room = self.room();
+        self.putn(text, style, self.room());
+    }
+
+    pub(crate) fn putn(&mut self, text: &str, style: Style, room: u16) {
+        let room = room.min(self.room());
         if room == 0 || text.is_empty() {
             return;
         }
@@ -80,16 +84,17 @@ impl<'a> Pen<'a> {
         if room == 0 {
             return;
         }
-        let stop = self.x + room - 1;
-        let (end, _) = self
-            .buf
-            .set_stringn(self.x, self.y, text, usize::from(room - 1), style);
-        self.x = end.min(stop);
+        self.putn(text, style, room - 1);
         self.put(ELLIPSIS, style);
     }
 
     pub(crate) fn fill(&mut self, symbol: &str, style: Style) {
-        while self.x < self.right {
+        self.fill_to(self.right, symbol, style);
+    }
+
+    pub(crate) fn fill_to(&mut self, to: u16, symbol: &str, style: Style) {
+        let to = to.min(self.right);
+        while self.x < to {
             self.buf[(self.x, self.y)]
                 .set_symbol(symbol)
                 .set_style(style);
