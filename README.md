@@ -99,7 +99,7 @@ is how AltGr arrives on some platforms, so diacritics can still be typed.
 ```text
 pub enum Key { Char(char), Ctrl(char), Alt(char), Tab, BackTab, Enter, Esc, Backspace,
                Left, Right, Up, Down, Other }          // non_exhaustive
-pub struct Styles { accent, muted, rule }              // non_exhaustive; build with Styles::new().accent(..)
+pub struct Styles { accent, muted, rule }              // plain fields; Styles::new() and the builders are the stable way to build it
 Section::new(name).short(short)
 Section::spans(&[(text, Style)]).short(short)          // one label in several styles
 Section::spans(..).short_spans(&[(text, Style)])         // the abbreviation in several styles
