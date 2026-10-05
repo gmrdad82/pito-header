@@ -41,6 +41,18 @@ type Span = (Cow<'static, str>, Style);
 pub struct Section {
     names: Names,
     spans: Vec<Span>,
+    short_spans: Vec<Span>,
+}
+
+fn owned(spans: &[(&str, Style)]) -> Vec<Span> {
+    spans
+        .iter()
+        .map(|(text, style)| (Cow::Owned(text.to_string()), *style))
+        .collect()
+}
+
+fn joined(spans: &[(&str, Style)]) -> String {
+    spans.iter().map(|(text, _)| *text).collect()
 }
 
 impl Section {
@@ -48,21 +60,27 @@ impl Section {
         Section {
             names: Names::new(name),
             spans: Vec::new(),
+            short_spans: Vec::new(),
         }
     }
 
     pub fn spans(spans: &[(&str, Style)]) -> Self {
         Section {
-            names: Names::new(spans.iter().map(|(text, _)| *text).collect::<String>()),
-            spans: spans
-                .iter()
-                .map(|(text, style)| (Cow::Owned(text.to_string()), *style))
-                .collect(),
+            names: Names::new(joined(spans)),
+            spans: owned(spans),
+            short_spans: Vec::new(),
         }
     }
 
     pub fn short(mut self, short: impl Into<Cow<'static, str>>) -> Self {
         self.names.short = Some(short.into());
+        self.short_spans.clear();
+        self
+    }
+
+    pub fn short_spans(mut self, spans: &[(&str, Style)]) -> Self {
+        self.names.short = Some(Cow::Owned(joined(spans)));
+        self.short_spans = owned(spans);
         self
     }
 
@@ -519,7 +537,9 @@ fn group_text(group: &Group, on: bool, form: Form) -> &str {
 
 fn section_body(section: &Section, on: bool, form: Form) -> (&str, &[Span]) {
     let spans = section.spans.as_slice();
-    let short = if section.names.short.is_none() && !spans.is_empty() {
+    let short = if !section.short_spans.is_empty() {
+        ("", section.short_spans.as_slice())
+    } else if section.names.short.is_none() && !spans.is_empty() {
         ("", spans)
     } else {
         (section.short_name(), &[][..])

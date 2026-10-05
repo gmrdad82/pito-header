@@ -7,7 +7,7 @@ terminal UI. It has no app logic and no words of its own: the app passes in
 every name, every style and every key.
 
 ```toml
-pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.4" }
+pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.5" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
@@ -59,8 +59,10 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
   such as a host name next to its state. Each span draws in its own style over
   the cell's, so the selected section keeps its accent and bold on the whole
   cell, a span with no colour of its own takes the cell's, and `short` still
-  sets the abbreviation. Abbreviation and clipping work as for a plain label,
-  and a click anywhere on the cell lands on the section.
+  sets the abbreviation as plain text. `short_spans` sets it as styled spans
+  instead, drawn the same way in the short and lone forms; the last of the two
+  calls wins. Abbreviation and clipping work as for a plain label, and a click
+  anywhere on the cell lands on the section.
 - **Clicks:** `hit(area, column, row)` names the group or section under the
   pointer; the crate never reads the mouse itself.
 - **Widths by cell:** Unicode widths throughout, so diacritics (ă, î, ș, ț),
@@ -77,6 +79,7 @@ pub enum Key { Char(char), Ctrl(char), Tab, BackTab, Enter, Esc, Backspace,
 pub struct Styles { accent, muted, rule }              // all Style::new() by default
 Section::new(name).short(short)
 Section::spans(&[(text, Style)]).short(short)          // one label in several styles
+Section::spans(..).short_spans(&[(text, Style)])         // the abbreviation in several styles
 Group::new(name).short(short).section(section)
 Nav::new(groups).keys(NavKeys)
   place() -> Place { group, section, number }          // number is 1-based, 0 when empty

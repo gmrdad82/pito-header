@@ -230,6 +230,61 @@ fn a_spanned_section_abbreviates_and_clips_like_a_plain_one() {
     assert_eq!(text(&nav, 20), "1  2  3 B");
 }
 
+fn short_hosts() -> Nav {
+    Nav::new(vec![
+        Group::new("Main")
+            .section(
+                Section::spans(&[("Host ", GREEN), ("alpha", RED)])
+                    .short_spans(&[("H ", GREEN), ("a", RED)]),
+            )
+            .section(Section::new("Other"))
+            .section(
+                Section::spans(&[("Host ", GREEN), ("beta", Style::new())])
+                    .short_spans(&[("H ", GREEN), ("b", Style::new())]),
+            ),
+    ])
+}
+
+#[test]
+fn short_spans_keep_their_styles_in_the_short_and_lone_forms() {
+    let mut nav = short_hosts();
+    let row = |nav: &Nav, width: u16| host_row(nav, width);
+    let full = row(&nav, 60);
+    assert_eq!(full.0, "1 Host alpha  2 Other  3 Host beta");
+    let short = row(&nav, 30);
+    assert_eq!(short.0, "1 H a  2 Other  3 H b");
+    assert_eq!(short.1, "AAAGGXAmmmmmmmmmmmmggmm");
+    let lone = row(&nav, 13);
+    assert_eq!(lone.0, "1 H a  2  3");
+    assert_eq!(lone.1, "AAAGGXAmmmmmm");
+    assert_eq!(row(&nav, 12).0, "1  2  3");
+    nav.go(3);
+    assert_eq!(row(&nav, 30).1, "mmmggxmmmmmmmmmmAAAGGAA");
+    let lone = row(&nav, 13);
+    assert_eq!(lone.0, "1  2  3 H b");
+    assert_eq!(lone.1, "mmmmmmAAAGGAA");
+}
+
+#[test]
+fn the_last_short_call_wins_and_spans_without_a_short_keep_their_form() {
+    let plain = Nav::new(vec![
+        Group::new("Main").section(
+            Section::spans(&[("Host ", GREEN), ("alpha", RED)])
+                .short_spans(&[("H ", GREEN), ("a", RED)])
+                .short("Hst"),
+        ),
+    ]);
+    assert_eq!(plain.section().map(Section::short_name), Some("Hst"));
+    assert_eq!(
+        host_row(&plain, 10),
+        ("1 Hst".to_string(), "AAAAAAA".to_string())
+    );
+    let spans = short_hosts();
+    assert_eq!(spans.section().map(Section::short_name), Some("H a"));
+    let kept = hosts();
+    assert_eq!(host_row(&kept, 28).0, "1 Host alpha  2 Other  3 B");
+}
+
 #[test]
 fn a_spanned_section_is_hit_as_one_cell() {
     let nav = hosts();
