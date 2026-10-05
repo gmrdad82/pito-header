@@ -17,51 +17,66 @@ const JOIN: &str = " / ";
 pub(crate) const RULE: &str = "─";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Section {
+struct Names {
     name: Cow<'static, str>,
     short: Option<Cow<'static, str>>,
 }
 
-impl Section {
-    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
-        Section {
+impl Names {
+    fn new(name: impl Into<Cow<'static, str>>) -> Self {
+        Names {
             name: name.into(),
             short: None,
         }
     }
 
-    pub fn short(mut self, short: impl Into<Cow<'static, str>>) -> Self {
-        self.short = Some(short.into());
-        self
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn short_name(&self) -> &str {
+    fn short_name(&self) -> &str {
         self.short.as_deref().unwrap_or(&self.name)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Section {
+    names: Names,
+}
+
+impl Section {
+    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
+        Section {
+            names: Names::new(name),
+        }
+    }
+
+    pub fn short(mut self, short: impl Into<Cow<'static, str>>) -> Self {
+        self.names.short = Some(short.into());
+        self
+    }
+
+    pub fn name(&self) -> &str {
+        &self.names.name
+    }
+
+    pub fn short_name(&self) -> &str {
+        self.names.short_name()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group {
-    name: Cow<'static, str>,
-    short: Option<Cow<'static, str>>,
+    names: Names,
     sections: Vec<Section>,
 }
 
 impl Group {
     pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
         Group {
-            name: name.into(),
-            short: None,
+            names: Names::new(name),
             sections: Vec::new(),
         }
     }
 
     pub fn short(mut self, short: impl Into<Cow<'static, str>>) -> Self {
-        self.short = Some(short.into());
+        self.names.short = Some(short.into());
         self
     }
 
@@ -71,11 +86,11 @@ impl Group {
     }
 
     pub fn name(&self) -> &str {
-        &self.name
+        &self.names.name
     }
 
     pub fn short_name(&self) -> &str {
-        self.short.as_deref().unwrap_or(&self.name)
+        self.names.short_name()
     }
 
     pub fn sections(&self) -> &[Section] {
@@ -728,6 +743,20 @@ enum Trail {
     Last,
 }
 
+impl Trail {
+    fn shown(self, index: usize, count: usize, crumb: &str) -> Option<&str> {
+        let last = index + 1 == count;
+        match self {
+            Trail::Whole => Some(crumb),
+            Trail::Ends if index == 0 || last => Some(crumb),
+            Trail::Ends if index == 1 => Some(ELLIPSIS),
+            Trail::Last if last => Some(crumb),
+            Trail::Last if index == 0 => Some(ELLIPSIS),
+            Trail::Ends | Trail::Last => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Breadcrumb<'a> {
     nav: &'a Nav,
@@ -759,20 +788,11 @@ impl<'a> Breadcrumb<'a> {
         let join = text::width(JOIN);
         let mut total = 0u16;
         for (index, crumb) in self.nav.crumbs().enumerate() {
-            let shown = match trail {
-                Trail::Whole => Some(text::width(crumb)),
-                Trail::Ends if index == 0 || index + 1 == count => Some(text::width(crumb)),
-                Trail::Ends if index == 1 => Some(text::width(ELLIPSIS)),
-                Trail::Ends => None,
-                Trail::Last if index + 1 == count => Some(text::width(crumb)),
-                Trail::Last if index == 0 => Some(text::width(ELLIPSIS)),
-                Trail::Last => None,
-            };
-            if let Some(width) = shown {
+            if let Some(shown) = trail.shown(index, count, crumb) {
                 if total > 0 {
                     total = total.saturating_add(join);
                 }
-                total = total.saturating_add(width);
+                total = total.saturating_add(text::width(shown));
             }
         }
         total
@@ -783,16 +803,7 @@ impl<'a> Breadcrumb<'a> {
         let mut first = true;
         let stop = pen.x.saturating_add(room);
         for (index, crumb) in self.nav.crumbs().enumerate() {
-            let shown = match trail {
-                Trail::Whole => Some(crumb),
-                Trail::Ends if index == 0 || index + 1 == count => Some(crumb),
-                Trail::Ends if index == 1 => Some(ELLIPSIS),
-                Trail::Ends => None,
-                Trail::Last if index + 1 == count => Some(crumb),
-                Trail::Last if index == 0 && count > 1 => Some(ELLIPSIS),
-                Trail::Last => None,
-            };
-            let Some(shown) = shown else {
+            let Some(shown) = trail.shown(index, count, crumb) else {
                 continue;
             };
             if !first {
