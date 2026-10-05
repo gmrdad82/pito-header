@@ -25,23 +25,66 @@ enum Slot<'a> {
     Empty,
     One(Fact<'a>),
     Parts(&'a [Fact<'a>]),
+    Pairs(&'a [(String, Style)]),
 }
 
 impl<'a> Slot<'a> {
-    fn parts(&self) -> &[Fact<'a>] {
-        match self {
-            Slot::Empty => &[],
-            Slot::One(fact) => std::slice::from_ref(fact),
-            Slot::Parts(parts) => parts,
+    fn parts(&self) -> Parts<'a> {
+        match *self {
+            Slot::Empty => Parts::Slice(&[]),
+            Slot::One(fact) => Parts::One(fact),
+            Slot::Parts(parts) => Parts::Slice(parts),
+            Slot::Pairs(pairs) => Parts::Pairs(pairs),
         }
     }
 
     fn width(&self) -> u16 {
-        parts_width(self.parts())
+        self.parts().width()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Parts<'a> {
+    One(Fact<'a>),
+    Slice(&'a [Fact<'a>]),
+    Pairs(&'a [(String, Style)]),
+}
+
+impl<'a> Parts<'a> {
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Parts::One(_) => 1,
+            Parts::Slice(parts) => parts.len(),
+            Parts::Pairs(pairs) => pairs.len(),
+        }
+    }
+
+    fn get(&self, index: usize) -> Fact<'a> {
+        match *self {
+            Parts::One(fact) => fact,
+            Parts::Slice(parts) => parts[index],
+            Parts::Pairs(pairs) => Fact::new(&pairs[index].0, pairs[index].1),
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = Fact<'a>> + Clone {
+        let parts = *self;
+        (0..parts.len()).map(move |index| parts.get(index))
+    }
+
+    fn width(&self) -> u16 {
+        self.iter().fold(0u16, |total, part| {
+            total.saturating_add(text::width(part.text))
+        })
     }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Drill {
     #[default]
     Replace,
@@ -58,7 +101,7 @@ pub struct Header<'a> {
     tabs: bool,
     lit: bool,
     underline: bool,
-    facts: &'a [Fact<'a>],
+    facts: Slot<'a>,
     facts_rule: bool,
     separator: &'a str,
     crumbs: bool,
@@ -88,7 +131,7 @@ impl<'a> Header<'a> {
             tabs: true,
             lit: true,
             underline: false,
-            facts: &[],
+            facts: Slot::Empty,
             facts_rule: false,
             separator: SEPARATOR,
             crumbs: false,
@@ -104,7 +147,7 @@ impl<'a> Header<'a> {
     }
 
     pub fn title(mut self, title: Option<&'a str>) -> Self {
-        self.title = title;
+        self.title = title.filter(|title| !title.is_empty());
         self
     }
 
@@ -128,6 +171,16 @@ impl<'a> Header<'a> {
         self
     }
 
+    pub fn left_pairs(mut self, parts: &'a [(String, Style)]) -> Self {
+        self.left = slot(Slot::Pairs(parts));
+        self
+    }
+
+    pub fn right_pairs(mut self, parts: &'a [(String, Style)]) -> Self {
+        self.right = slot(Slot::Pairs(parts));
+        self
+    }
+
     pub fn tabs(mut self, tabs: bool) -> Self {
         self.tabs = tabs;
         self
@@ -144,7 +197,12 @@ impl<'a> Header<'a> {
     }
 
     pub fn facts(mut self, facts: &'a [Fact<'a>]) -> Self {
-        self.facts = facts;
+        self.facts = Slot::Parts(facts);
+        self
+    }
+
+    pub fn facts_pairs(mut self, facts: &'a [(String, Style)]) -> Self {
+        self.facts = Slot::Pairs(facts);
         self
     }
 
@@ -182,7 +240,7 @@ impl<'a> Header<'a> {
         let replaced = self.replaced();
         u16::from(self.title.is_some())
             + if self.tabs { self.bar().height() } else { 0 }
-            + u16::from(!self.facts.is_empty() && !replaced)
+            + u16::from(self.has_facts() && !replaced)
             + u16::from(self.crumbs && !replaced)
             + u16::from(self.closing)
             + u16::from(self.notice.is_some())
@@ -195,6 +253,10 @@ impl<'a> Header<'a> {
             return None;
         }
         bar.hit(tabs, column, row)
+    }
+
+    fn has_facts(&self) -> bool {
+        self.facts.parts().iter().any(|fact| !fact.text.is_empty())
     }
 
     fn replaced(&self) -> bool {
@@ -222,7 +284,7 @@ impl<'a> Header<'a> {
         Rows {
             title: take(self.title.is_some(), 1),
             tabs: take(self.tabs, self.bar().height()),
-            facts: take(!self.facts.is_empty() && !self.replaced(), 1),
+            facts: take(self.has_facts() && !self.replaced(), 1),
             crumbs: take(self.crumbs && !self.replaced(), 1),
             closing: take(self.closing, 1),
             notice: take(self.notice.is_some(), 1),
@@ -236,17 +298,21 @@ impl<'a> Header<'a> {
         let rule = self.styles.rule;
         let lit = self.styles.lit();
         let wide = text::width(title).saturating_add(2).min(line.width);
-        let start = line.x + (line.width - wide) / 2;
+        let start = line.x.saturating_add((line.width - wide) / 2);
         let side = start.saturating_sub(line.x).saturating_sub(2);
         let sides = side >= SIDE_MIN;
         if sides && self.left != Slot::Empty {
-            pen.fill_to(line.x + 1, RULE, rule);
+            pen.fill_to(line.x.saturating_add(1), RULE, rule);
             label(&mut pen, self.left.parts(), side - 2);
         }
         pen.fill_to(start, RULE, rule);
-        label(&mut pen, &[Fact::new(title, lit)], wide.saturating_sub(2));
+        label(
+            &mut pen,
+            Parts::One(Fact::new(title, lit)),
+            wide.saturating_sub(2),
+        );
         if sides && self.right != Slot::Empty {
-            let wide = self.right.width().min(side - 2) + 2;
+            let wide = self.right.width().min(side - 2).saturating_add(2);
             pen.fill_to(line.right().saturating_sub(1 + wide), RULE, rule);
             label(&mut pen, self.right.parts(), wide - 2);
         }
@@ -273,19 +339,17 @@ impl<'a> Header<'a> {
     fn draw_facts(&self, buf: &mut Buffer, line: Rect) {
         let pad = if self.facts_rule { 1 } else { 0 };
         let separator = text::width(self.separator);
-        let inner = self
-            .facts
-            .iter()
-            .enumerate()
-            .fold(0u16, |total, (index, fact)| {
-                let gap = if index > 0 { separator } else { 0 };
-                total
-                    .saturating_add(gap)
-                    .saturating_add(text::width(fact.text))
-            });
+        let facts = self.facts.parts();
+        let present = || facts.iter().filter(|fact| !fact.text.is_empty());
+        let inner = present().enumerate().fold(0u16, |total, (index, fact)| {
+            let gap = if index > 0 { separator } else { 0 };
+            total
+                .saturating_add(gap)
+                .saturating_add(text::width(fact.text))
+        });
         let shown = inner.min(line.width.saturating_sub(4 * pad));
-        let block = shown + 2 * pad;
-        let start = line.x + line.width.saturating_sub(block) / 2;
+        let block = shown.saturating_add(2 * pad);
+        let start = line.x.saturating_add(line.width.saturating_sub(block) / 2);
         let rule = self.styles.rule;
         let Some(mut pen) = Pen::new(buf, line, line.x, line.y) else {
             return;
@@ -293,22 +357,28 @@ impl<'a> Header<'a> {
         if self.facts_rule {
             pen.fill_to(start, RULE, rule);
         } else {
-            pen.skip(start - line.x);
+            pen.skip(start.saturating_sub(line.x));
         }
         let muted = self.styles.muted;
         if pad > 0 {
             pen.put(" ", muted);
         }
         let end = pen.x.saturating_add(shown);
-        for (index, fact) in self.facts.iter().enumerate() {
+        for (index, fact) in present().enumerate() {
+            let wide = text::width(fact.text);
             if index > 0 {
-                if end.saturating_sub(pen.x) < separator + 2 {
-                    pen.clip(ELLIPSIS, muted, end.saturating_sub(pen.x));
+                let room = end.saturating_sub(pen.x);
+                if room < separator.saturating_add(wide.min(2)) {
+                    pen.clip(ELLIPSIS, muted, room);
                     break;
                 }
                 pen.put(self.separator, muted);
             }
-            pen.clip(fact.text, fact.style, end.saturating_sub(pen.x));
+            let room = end.saturating_sub(pen.x);
+            pen.clip(fact.text, fact.style, room);
+            if wide > room {
+                break;
+            }
         }
         if pad > 0 {
             pen.put(" ", muted);
@@ -328,29 +398,25 @@ fn slot(slot: Slot) -> Slot {
     if slot.width() == 0 { Slot::Empty } else { slot }
 }
 
-fn parts_width(parts: &[Fact]) -> u16 {
-    parts.iter().fold(0u16, |total, part| {
-        total.saturating_add(text::width(part.text))
-    })
-}
-
-fn label(pen: &mut Pen, parts: &[Fact], room: u16) {
-    let (Some(first), Some(last)) = (parts.first(), parts.last()) else {
+fn label(pen: &mut Pen, parts: Parts, room: u16) {
+    if parts.is_empty() {
         return;
-    };
-    pen.put(" ", first.style);
-    if parts_width(parts) <= room {
-        for part in parts {
+    }
+    let first = parts.get(0).style;
+    let last = parts.get(parts.len() - 1).style;
+    pen.put(" ", first);
+    if parts.width() <= room {
+        for part in parts.iter() {
             pen.put(part.text, part.style);
         }
     } else if room > 0 {
         let stop = pen.x.saturating_add(room - 1);
-        let mut style = first.style;
-        for part in parts {
+        let mut style = first;
+        for part in parts.iter().filter(|part| !part.text.is_empty()) {
+            style = part.style;
             if pen.x >= stop {
                 break;
             }
-            style = part.style;
             let start = pen.x;
             pen.putn(part.text, part.style, stop - pen.x);
             if pen.x - start < text::width(part.text) {
@@ -360,7 +426,7 @@ fn label(pen: &mut Pen, parts: &[Fact], room: u16) {
         pen.x = pen.x.min(stop);
         pen.put(ELLIPSIS, style);
     }
-    pen.put(" ", last.style);
+    pen.put(" ", last);
 }
 
 impl Widget for Header<'_> {

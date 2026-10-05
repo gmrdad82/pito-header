@@ -84,6 +84,26 @@ impl Section {
         self
     }
 
+    pub fn set_name(&mut self, name: impl Into<Cow<'static, str>>) {
+        self.names.name = name.into();
+        self.spans.clear();
+    }
+
+    pub fn set_spans(&mut self, spans: &[(&str, Style)]) {
+        self.names.name = Cow::Owned(joined(spans));
+        self.spans = owned(spans);
+    }
+
+    pub fn set_short(&mut self, short: impl Into<Cow<'static, str>>) {
+        self.names.short = Some(short.into());
+        self.short_spans.clear();
+    }
+
+    pub fn set_short_spans(&mut self, spans: &[(&str, Style)]) {
+        self.names.short = Some(Cow::Owned(joined(spans)));
+        self.short_spans = owned(spans);
+    }
+
     pub fn name(&self) -> &str {
         &self.names.name
     }
@@ -138,6 +158,7 @@ pub struct Place {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Action {
     NextGroup,
     PrevGroup,
@@ -149,6 +170,7 @@ pub enum Action {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NavKeys {
     pub next_group: &'static [Key],
     pub prev_group: &'static [Key],
@@ -179,6 +201,41 @@ impl NavKeys {
         digits: false,
         swallow_digits: false,
     };
+
+    pub const fn next_group(mut self, keys: &'static [Key]) -> Self {
+        self.next_group = keys;
+        self
+    }
+
+    pub const fn prev_group(mut self, keys: &'static [Key]) -> Self {
+        self.prev_group = keys;
+        self
+    }
+
+    pub const fn next_section(mut self, keys: &'static [Key]) -> Self {
+        self.next_section = keys;
+        self
+    }
+
+    pub const fn prev_section(mut self, keys: &'static [Key]) -> Self {
+        self.prev_section = keys;
+        self
+    }
+
+    pub const fn back(mut self, keys: &'static [Key]) -> Self {
+        self.back = keys;
+        self
+    }
+
+    pub const fn digits(mut self, on: bool) -> Self {
+        self.digits = on;
+        self
+    }
+
+    pub const fn swallow_digits(mut self, on: bool) -> Self {
+        self.swallow_digits = on;
+        self
+    }
 }
 
 impl Default for NavKeys {
@@ -188,6 +245,7 @@ impl Default for NavKeys {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Step {
     Moved(Place),
     Back { selected: usize },
@@ -261,6 +319,10 @@ impl Nav {
         self.groups.get(place.group)?.sections.get(place.section)
     }
 
+    pub fn section_mut(&mut self, group: usize, section: usize) -> Option<&mut Section> {
+        self.groups.get_mut(group)?.sections.get_mut(section)
+    }
+
     pub fn count(&self) -> usize {
         self.stacks.len()
     }
@@ -293,17 +355,30 @@ impl Nav {
     }
 
     pub fn cycle(&mut self, by: isize) -> Option<Place> {
-        let count = self.groups.len() as isize;
+        if by == 0 {
+            return Some(self.place());
+        }
+        let filled = self
+            .groups
+            .iter()
+            .filter(|group| !group.sections.is_empty())
+            .count();
+        if filled < 2 {
+            return None;
+        }
         let step = if by < 0 { -1 } else { 1 };
+        let count = self.groups.len() as isize;
         let mut index = self.group as isize;
-        for _ in 1..count {
-            index = (index + step).rem_euclid(count);
-            if !self.groups[index as usize].sections.is_empty() {
-                self.group = index as usize;
-                return Some(self.place());
+        for _ in 0..by.unsigned_abs() % filled {
+            loop {
+                index = (index + step).rem_euclid(count);
+                if !self.groups[index as usize].sections.is_empty() {
+                    break;
+                }
             }
         }
-        None
+        self.group = index as usize;
+        Some(self.place())
     }
 
     pub fn step(&mut self, by: isize) -> Option<Place> {
@@ -312,7 +387,7 @@ impl Nav {
             return None;
         }
         let at = self.last[self.group] as isize;
-        self.last[self.group] = (at + by).rem_euclid(len) as usize;
+        self.last[self.group] = (at + by.rem_euclid(len)).rem_euclid(len) as usize;
         Some(self.place())
     }
 
@@ -499,7 +574,7 @@ impl Label<'_> {
         let number = self
             .shown()
             .map_or(0, |n| text::number_width(n) + u16::from(!self.empty()));
-        2 + number + self.body_width()
+        number.saturating_add(2).saturating_add(self.body_width())
     }
 
     fn draw(&self, pen: &mut Pen, style: Style, underline: bool) {
@@ -605,6 +680,9 @@ impl<'a> NavBar<'a> {
     }
 
     pub fn hit(&self, area: Rect, column: u16, row: u16) -> Option<Place> {
+        if column < area.x || column >= area.right() {
+            return None;
+        }
         let (groups, sections) = self.rows(area);
         if let Some(line) = groups
             && row == line.y
@@ -701,7 +779,7 @@ where
     for form in FORMS {
         let total = row_width(labels(form), gap);
         if total <= line.width {
-            return (form, line.x + (line.width - total) / 2);
+            return (form, line.x.saturating_add((line.width - total) / 2));
         }
     }
     (Form::Bare, line.x)
@@ -849,12 +927,14 @@ impl<'a> Breadcrumb<'a> {
     fn trail_width(&self, trail: Trail) -> u16 {
         let count = self.nav.crumbs().count();
         let join = text::width(JOIN);
+        let mut first = true;
         let mut total = 0u16;
         for (index, crumb) in self.nav.crumbs().enumerate() {
             if let Some(shown) = trail.shown(index, count, crumb) {
-                if total > 0 {
+                if !first {
                     total = total.saturating_add(join);
                 }
+                first = false;
                 total = total.saturating_add(text::width(shown));
             }
         }
@@ -863,17 +943,35 @@ impl<'a> Breadcrumb<'a> {
 
     fn draw_trail(&self, pen: &mut Pen, trail: Trail, room: u16, style: Style) {
         let count = self.nav.crumbs().count();
+        let join = text::width(JOIN);
         let mut first = true;
+        let mut elided = false;
         let stop = pen.x.saturating_add(room);
         for (index, crumb) in self.nav.crumbs().enumerate() {
             let Some(shown) = trail.shown(index, count, crumb) else {
                 continue;
             };
-            if !first {
-                pen.clip(JOIN, style, stop.saturating_sub(pen.x));
+            let left = stop.saturating_sub(pen.x);
+            let wide = text::width(shown);
+            if first {
+                pen.clip(shown, style, left);
+                if wide > left {
+                    return;
+                }
+            } else if join.saturating_add(wide) <= left {
+                pen.put(JOIN, style);
+                pen.put(shown, style);
+            } else {
+                if left > join {
+                    pen.put(JOIN, style);
+                    pen.clip(shown, style, left - join);
+                } else if !elided {
+                    pen.clip(ELLIPSIS, style, left);
+                }
+                return;
             }
             first = false;
-            pen.clip(shown, style, stop.saturating_sub(pen.x));
+            elided = shown == ELLIPSIS;
         }
     }
 }
@@ -904,7 +1002,11 @@ impl Widget for &Breadcrumb<'_> {
             .unwrap_or(Trail::Last);
         if self.centred {
             let block = self.trail_width(trail).min(room) + 2;
-            pen.fill_to(area.x + (area.width - block) / 2, RULE, rule);
+            pen.fill_to(
+                area.x.saturating_add(area.width.saturating_sub(block) / 2),
+                RULE,
+                rule,
+            );
         } else {
             pen.put(RULE, rule);
         }

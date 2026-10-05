@@ -7,11 +7,15 @@ terminal UI. It has no app logic and no words of its own: the app passes in
 every name, every style and every key.
 
 ```toml
-pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.1.5" }
+pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.2.0" }
 ```
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
-(crossterm 0.29); without it the crate has no backend dependency.
+(crossterm 0.29); without it the crate has no backend dependency. The
+conversion keeps Alt apart (`Key::Alt('q')` is not `Key::Char('q')`, so Alt+q
+is not Back), turns Alt, Super, Meta or Hyper on any other key into
+`Key::Other`, and passes Ctrl+Alt plus a character on as that character, which
+is how AltGr arrives on some platforms, so diacritics can still be typed.
 
 ## What it does
 
@@ -39,6 +43,10 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
   unless `swallow_digits` is on: then they map to `Action::Swallow`, which
   `apply` answers with `Step::Swallowed`, so the key is taken and nothing
   moves. Off by default, and only while `digits` is on.
+- **`cycle(by)` and `step(by)`** move by the size of `by` (negative goes
+  back) and wrap. `cycle` counts filled groups only and answers `None` when
+  there is no other group to go to; `cycle(0)` and `step(0)` stay where they
+  are and answer the place.
 - **Every group remembers its section:** `selected(group)` reads it from
   anywhere, so the app can jump to a group at its remembered section with
   `go_to(group, section)`, or show another group's section.
@@ -63,8 +71,23 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
   instead, drawn the same way in the short and lone forms; the last of the two
   calls wins. Abbreviation and clipping work as for a plain label, and a click
   anywhere on the cell lands on the section.
+- **A label that changes while the app runs:** `nav.section_mut(group,
+  section)` hands out the section, and `set_name`, `set_spans`, `set_short`
+  and `set_short_spans` change its label in place, so the current place, every
+  group's remembered section and every section's drill stack stay.
+- **Texts the app owns as `String`s:** `facts_pairs`, `left_pairs` and
+  `right_pairs` take a slice of `(String, Style)` and draw it like the
+  `Fact` forms, so the app needs no parallel `Vec<Fact>` each frame.
+- **Empty facts are skipped,** and a row of only empty facts takes no row. The
+  row elides with "…" only when the room left cannot hold the separator and
+  the next fact's first two cells (or the whole fact, if it is narrower); a cut
+  fact ends the row. An empty `title` is no title.
+- **Control characters take no cell:** a newline, tab or carriage return
+  inside a text is measured and drawn as one space between its two sides, and
+  one at either end is dropped, so a multi-line message reads as one line.
 - **Clicks:** `hit(area, column, row)` names the group or section under the
-  pointer; the crate never reads the mouse itself.
+  pointer, and nothing outside the area; the crate never reads the mouse
+  itself.
 - **Widths by cell:** Unicode widths throughout, so diacritics (ă, î, ș, ț),
   "…" and wide glyphs measure and clip cleanly.
 - **Cheap:** drawing writes straight into the buffer, with no allocation
@@ -74,34 +97,43 @@ Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
 ## The API
 
 ```text
-pub enum Key { Char(char), Ctrl(char), Tab, BackTab, Enter, Esc, Backspace,
-               Left, Right, Up, Down, Other }
-pub struct Styles { accent, muted, rule }              // all Style::new() by default
+pub enum Key { Char(char), Ctrl(char), Alt(char), Tab, BackTab, Enter, Esc, Backspace,
+               Left, Right, Up, Down, Other }          // non_exhaustive
+pub struct Styles { accent, muted, rule }              // non_exhaustive; build with Styles::new().accent(..)
 Section::new(name).short(short)
 Section::spans(&[(text, Style)]).short(short)          // one label in several styles
 Section::spans(..).short_spans(&[(text, Style)])         // the abbreviation in several styles
+  section.set_name(..), set_spans(..), set_short(..), set_short_spans(..)   // change a label in place
 Group::new(name).short(short).section(section)
 Nav::new(groups).keys(NavKeys)
   place() -> Place { group, section, number }          // number is 1-based, 0 when empty
   selected(group) -> Option<usize>                     // the section a group remembers
-  section(), count(), go(number), go_to(group, section), cycle(by), step(by)
+  section(), section_mut(group, section) -> Option<&mut Section>
+  count(), go(number), go_to(group, section), cycle(by), step(by)
   open(title, selected), back() -> Option<usize>, close() -> Option<usize>
   depth(), title(), crumbs(), breadcrumb() -> String
   action(Key) -> Option<Action>, apply(Action) -> Option<Step>, key(Key) -> Option<Step>
-pub enum Action { NextGroup, PrevGroup, NextSection, PrevSection, Go(usize), Back, Swallow }
-pub enum Step { Moved(Place), Back { selected }, Swallowed }
+pub enum Action { NextGroup, PrevGroup, NextSection, PrevSection, Go(usize), Back, Swallow }   // non_exhaustive
+pub enum Step { Moved(Place), Back { selected }, Swallowed }                                   // non_exhaustive
 NavKeys { next_group, prev_group, next_section, prev_section, back: &'static [Key], digits,
-          swallow_digits }                             // digits past the last section are taken
+          swallow_digits }                             // non_exhaustive; digits past the last section are taken
   NavKeys::HEY: tab / backtab, ] / [, digits, esc / q          NavKeys::NONE
+  .next_group(..) .prev_group(..) .next_section(..) .prev_section(..) .back(..)   // const builders
+  .digits(bool) .swallow_digits(bool)
 NavBar::new(&nav).styles(..).lit(bool).groups(bool).underline(bool); height(), hit(..)
 Breadcrumb::new(&nav).styles(..).centred(bool)
 Fact::new(text, style)
-pub enum Drill { Replace, Rows }                       // Replace by default
+pub enum Drill { Replace, Rows }                       // Replace by default; non_exhaustive
 Header::new(&nav).styles(..).title(..).left(..).right(..).tabs(bool).lit(bool)
   .left_parts(&[Fact]).right_parts(&[Fact])           // a slot in several styles
+  .left_pairs(&[(String, Style)]).right_pairs(&[(String, Style)]).facts_pairs(&[(String, Style)])
   .underline(bool).facts(&[Fact]).facts_rule(bool).separator(..).crumbs(bool)
   .closing(bool).notice(Option<Fact>).drill(Drill); height(), hit(..)
 ```
+
+Every public enum, and `NavKeys` and `Styles`, are `#[non_exhaustive]`: match
+them with a wildcard arm, and build the structs with `new()`, `HEY` or `NONE`
+and their methods, so a later release can add to them in a minor version.
 
 `lit(false)` keeps the group lit but dims the current section, for a page
 that sits over every section (help, settings). `underline(true)` underlines
@@ -159,6 +191,7 @@ fn key(nav: &mut Nav, key: Key, selected: &mut usize) {
         Some(Step::Back { selected: kept }) => *selected = kept,
         Some(Step::Moved(_)) => *selected = 0,
         Some(Step::Swallowed) => {}
+        Some(_) => {}
         None if key == Key::Enter => nav.open(format!("item {selected}"), *selected),
         None => {}
     }
@@ -183,7 +216,8 @@ fn draw(frame: &mut Frame, nav: &Nav) {
 
 `bin/gate` runs `cargo fmt --check`, `cargo clippy --all-targets
 --all-features -- -D warnings`, `cargo test --all-features` (the tests draw
-through ratatui's `TestBackend`, and this README's example compiles as a
+through ratatui's `TestBackend`, a counting allocator holds that drawing and
+hit-testing allocate nothing, and this README's example compiles as a
 doctest) and builds the bench.
 
 ## Licence

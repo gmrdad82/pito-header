@@ -1,9 +1,8 @@
 [package]
 name = "pito-header"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Gamer Dad"]
 edition = "2024"
-rust-version = "1.97"
 description = "A nested top navigation for ratatui apps: groups of numbered sections, drill-in with a breadcrumb, and two header rows that abbreviate to fit"
 license = "MIT"
 repository = "https://github.com/gmrdad82/pito-header"

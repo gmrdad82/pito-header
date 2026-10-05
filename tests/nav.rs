@@ -39,10 +39,7 @@ fn a_digit_past_the_last_section_does_nothing() {
 
 #[test]
 fn a_digit_past_the_last_section_is_swallowed_on_request() {
-    let mut nav = nav().keys(NavKeys {
-        swallow_digits: true,
-        ..NavKeys::HEY
-    });
+    let mut nav = nav().keys(NavKeys::HEY.swallow_digits(true));
     nav.go(4);
     for digit in ['0', '1'] {
         let past = digit == '0';
@@ -58,11 +55,7 @@ fn a_digit_past_the_last_section_is_swallowed_on_request() {
 
 #[test]
 fn swallowing_needs_the_digits() {
-    let nav = nav().keys(NavKeys {
-        digits: false,
-        swallow_digits: true,
-        ..NavKeys::HEY
-    });
+    let nav = nav().keys(NavKeys::HEY.digits(false).swallow_digits(true));
     assert_eq!(nav.action(Key::Char('0')), None);
     assert_eq!(nav.action(Key::Char('1')), None);
     let defaults = [NavKeys::HEY, NavKeys::NONE, NavKeys::default()];
@@ -170,15 +163,12 @@ fn each_section_keeps_its_own_depth() {
 
 #[test]
 fn keys_are_configurable_and_never_taken_without_a_match() {
-    const KEYS: NavKeys = NavKeys {
-        next_group: &[Key::Right],
-        prev_group: &[Key::Left],
-        next_section: &[Key::Down],
-        prev_section: &[Key::Up],
-        back: &[Key::Esc, Key::Char('q'), Key::Char('Q'), Key::Backspace],
-        digits: false,
-        swallow_digits: false,
-    };
+    const KEYS: NavKeys = NavKeys::NONE
+        .next_group(&[Key::Right])
+        .prev_group(&[Key::Left])
+        .next_section(&[Key::Down])
+        .prev_section(&[Key::Up])
+        .back(&[Key::Esc, Key::Char('q'), Key::Char('Q'), Key::Backspace]);
     let mut nav = nav().keys(KEYS);
     assert_eq!(nav.action(Key::Tab), None);
     assert_eq!(nav.action(Key::Char(']')), None);
