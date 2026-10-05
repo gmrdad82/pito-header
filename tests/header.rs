@@ -189,6 +189,68 @@ fn the_tenth_section_draws_its_key_zero() {
     );
 }
 
+fn hosts() -> Nav {
+    Nav::new(vec![
+        Group::new("Main")
+            .section(Section::spans(&[("Host ", GREEN), ("alpha", RED)]))
+            .section(Section::new("Other"))
+            .section(Section::spans(&[("Host ", GREEN), ("beta", Style::new())]).short("B")),
+    ])
+}
+
+fn host_row(nav: &Nav, width: u16) -> (String, String) {
+    let drawn = draw(NavBar::new(nav).styles(STYLES), width, 1);
+    (
+        drawn.text[0].trim().to_string(),
+        drawn.marks[0].trim().to_string(),
+    )
+}
+
+#[test]
+fn a_spanned_section_draws_each_span_in_its_own_style() {
+    let nav = hosts();
+    let (text, marks) = host_row(&nav, 60);
+    assert_eq!(text, "1 Host alpha  2 Other  3 Host beta");
+    assert_eq!(marks, "AAAGGGGGXXXXXAmmmmmmmmmmmmgggggmmmmm");
+    assert_eq!(nav.section().map(Section::name), Some("Host alpha"));
+}
+
+#[test]
+fn a_spanned_section_abbreviates_and_clips_like_a_plain_one() {
+    let mut nav = hosts();
+    let text = |nav: &Nav, width: u16| host_row(nav, width).0;
+    assert_eq!(text(&nav, 38), "1 Host alpha  2 Other  3 Host beta");
+    assert_eq!(text(&nav, 30), "1 Host alpha  2 Other  3 B");
+    assert_eq!(text(&nav, 20), "1 Host alpha  2  3");
+    assert_eq!(host_row(&nav, 20).1, "AAAGGGGGXXXXXAmmmmmm");
+    assert_eq!(text(&nav, 12), "1  2  3");
+    assert_eq!(text(&nav, 2), "1");
+    nav.go(3);
+    assert_eq!(text(&nav, 30), "1 Host alpha  2 Other  3 B");
+    assert_eq!(text(&nav, 20), "1  2  3 B");
+}
+
+#[test]
+fn a_spanned_section_is_hit_as_one_cell() {
+    let nav = hosts();
+    let bar = NavBar::new(&nav).styles(STYLES);
+    let area = Rect::new(0, 0, 60, 1);
+    let place = |section: usize| {
+        Some(Place {
+            group: 0,
+            section,
+            number: section + 1,
+        })
+    };
+    assert_eq!(bar.hit(area, 11, 0), None);
+    for column in [12, 14, 19, 20, 25] {
+        assert_eq!(bar.hit(area, column, 0), place(0), "{column}");
+    }
+    assert_eq!(bar.hit(area, 26, 0), place(1));
+    assert_eq!(bar.hit(area, 35, 0), place(2));
+    assert_eq!(bar.hit(area, 48, 0), None);
+}
+
 const TRIAL: [Fact; 2] = [Fact::new("trial: ", GRAY), Fact::new("9 days", MAGENTA)];
 const HELP: [Fact; 2] = [Fact::new("?", MAGENTA), Fact::new(" help", GRAY)];
 

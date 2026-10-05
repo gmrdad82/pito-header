@@ -58,6 +58,8 @@ fn mark(style: Style) -> char {
         (Some(Color::DarkGray), false, false) => 'm',
         (Some(Color::Gray), false, false) => 'r',
         (Some(Color::Green), false, false) => 'g',
+        (Some(Color::Green), true, false) => 'G',
+        (Some(Color::Red), true, false) => 'X',
         (Some(Color::Red), false, false) => 'x',
         (None | Some(Color::Reset), false, false) => ' ',
         _ => '?',

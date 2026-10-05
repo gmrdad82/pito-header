@@ -35,15 +35,29 @@ impl Names {
     }
 }
 
+type Span = (Cow<'static, str>, Style);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
     names: Names,
+    spans: Vec<Span>,
 }
 
 impl Section {
     pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
         Section {
             names: Names::new(name),
+            spans: Vec::new(),
+        }
+    }
+
+    pub fn spans(spans: &[(&str, Style)]) -> Self {
+        Section {
+            names: Names::new(spans.iter().map(|(text, _)| *text).collect::<String>()),
+            spans: spans
+                .iter()
+                .map(|(text, style)| (Cow::Owned(text.to_string()), *style))
+                .collect(),
         }
     }
 
@@ -441,6 +455,7 @@ const FORMS: [Form; 4] = [Form::Full, Form::Short, Form::Lone, Form::Bare];
 struct Label<'a> {
     number: Option<usize>,
     text: &'a str,
+    spans: &'a [Span],
     on: bool,
 }
 
@@ -449,11 +464,24 @@ impl Label<'_> {
         self.number.map(|n| if n == 10 { 0 } else { n })
     }
 
+    fn empty(&self) -> bool {
+        self.spans.is_empty() && self.text.is_empty()
+    }
+
+    fn body_width(&self) -> u16 {
+        if self.spans.is_empty() {
+            return text::width(self.text);
+        }
+        self.spans.iter().fold(0u16, |total, (text, _)| {
+            total.saturating_add(text::width(text))
+        })
+    }
+
     fn width(&self) -> u16 {
-        let number = self.shown().map_or(0, |n| {
-            text::number_width(n) + u16::from(!self.text.is_empty())
-        });
-        2 + number + text::width(self.text)
+        let number = self
+            .shown()
+            .map_or(0, |n| text::number_width(n) + u16::from(!self.empty()));
+        2 + number + self.body_width()
     }
 
     fn draw(&self, pen: &mut Pen, style: Style, underline: bool) {
@@ -466,11 +494,16 @@ impl Label<'_> {
                 style
             };
             pen.put(text::digits(number, &mut digits), number_style);
-            if !self.text.is_empty() {
+            if !self.empty() {
                 pen.put(" ", style);
             }
         }
-        pen.put(self.text, style);
+        if self.spans.is_empty() {
+            pen.put(self.text, style);
+        }
+        for (text, span) in self.spans {
+            pen.put(text, style.patch(*span));
+        }
         pen.put(" ", style);
     }
 }
@@ -484,12 +517,19 @@ fn group_text(group: &Group, on: bool, form: Form) -> &str {
     }
 }
 
-fn section_text(section: &Section, on: bool, form: Form) -> &str {
+fn section_body(section: &Section, on: bool, form: Form) -> (&str, &[Span]) {
+    let spans = section.spans.as_slice();
+    let short = if section.names.short.is_none() && !spans.is_empty() {
+        ("", spans)
+    } else {
+        (section.short_name(), &[][..])
+    };
     match form {
-        Form::Full => section.name(),
-        Form::Short => section.short_name(),
-        Form::Lone if on => section.short_name(),
-        Form::Lone | Form::Bare => "",
+        Form::Full if !spans.is_empty() => ("", spans),
+        Form::Full => (section.name(), &[]),
+        Form::Short => short,
+        Form::Lone if on => short,
+        Form::Lone | Form::Bare => ("", &[]),
     }
 }
 
@@ -597,6 +637,7 @@ impl<'a> NavBar<'a> {
                 Label {
                     number: None,
                     text: group_text(group, on, form),
+                    spans: &[],
                     on,
                 }
             })
@@ -614,9 +655,11 @@ impl<'a> NavBar<'a> {
             .enumerate()
             .map(move |(index, section)| {
                 let on = index == place.section;
+                let (text, spans) = section_body(section, on, form);
                 Label {
                     number: Some(offset + index + 1),
-                    text: section_text(section, on, form),
+                    text,
+                    spans,
                     on,
                 }
             })
