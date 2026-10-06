@@ -218,7 +218,8 @@ fn draw(frame: &mut Frame, nav: &Nav) {
 --all-features -- -D warnings`, `cargo test --all-features` (the tests draw
 through ratatui's `TestBackend`, a counting allocator holds that drawing and
 hit-testing allocate nothing, and this README's example compiles as a
-doctest) and builds the bench.
+doctest) and builds the bench. `bin/gate --fast` leaves the bench build
+out.
 
 ## Licence
 
