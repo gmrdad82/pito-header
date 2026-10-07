@@ -19,3 +19,10 @@ crossterm = { version = "0.29", default-features = false, features = ["events"],
 ratatui = { version = "0.30", default-features = false }
 unicode-segmentation = "1"
 unicode-width = "0.2"
+
+[dev-dependencies]
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+
+[[example]]
+name = "demo"
+required-features = ["crossterm"]

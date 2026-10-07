@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+prec clip pito-header demo --size 1000x400 --fps 30 --no-encode --no-archive --out tmp/demo
+frames=$(ls -dt tmp/prec/run/pito-header-clip-demo-replay-*/frames | head -1)
+ls "$frames" | awk -v dir="$PWD/$frames" -F'[-.]' '
+    { n[NR] = $2 + 0; f[NR] = $0 }
+    END {
+        for (i = 1; i <= NR; i++)
+            printf "file '\''%s/%s'\''\nduration %.4f\n", dir, f[i], (i < NR ? (n[i + 1] - n[i]) / 30 : 0.4)
+        printf "file '\''%s/%s'\''\n", dir, f[NR]
+    }' > tmp/demo/frames.txt
+ffmpeg -y -loglevel error -f concat -safe 0 -i tmp/demo/frames.txt \
+    -vf "split[a][b];[a]palettegen=stats_mode=full:reserve_transparent=0[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" \
+    -fps_mode vfr -loop 0 -map_metadata -1 docs/demo.gif

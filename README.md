@@ -1,14 +1,20 @@
 # pito-header
 
-The top of a pito terminal app, as a small ratatui 0.30 crate: groups of
-numbered sections drawn as two nested rows, drill-in with a breadcrumb, and
-optional title, facts and notice rows. The look is in the style of HEY's
-terminal UI. It has no app logic and no words of its own: the app passes in
-every name, every style and every key.
+![The demo: groups and numbered sections, drilling into a check and back](docs/demo.gif)
+
+The top of a [PITO](https://pitomd.com) terminal app, as a small ratatui 0.30
+crate: groups of numbered sections drawn as two nested rows, drill-in with a
+breadcrumb, and optional title, facts and notice rows. The look is in the
+style of HEY's terminal UI. It has no app logic and no words of its own: the
+app passes in every name, every style and every key.
 
 ```toml
 pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.2.0" }
 ```
+
+Try it with `cargo run --example demo --features crossterm`: `tab` and
+`shift+tab` change group, `]` and `[` change section, a digit jumps to a
+section, `enter` drills in, `esc` goes back and `q` quits at the top.
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
 (crossterm 0.29); without it the crate has no backend dependency. The
@@ -219,7 +225,8 @@ fn draw(frame: &mut Frame, nav: &Nav) {
 through ratatui's `TestBackend`, a counting allocator holds that drawing and
 hit-testing allocate nothing, and this README's example compiles as a
 doctest) and builds the bench. `bin/gate --fast` leaves the bench build
-out.
+out. `bin/demo-gif` records the demo from `render/terminal.toml` and its tape
+into `docs/demo.gif`.
 
 ## Licence
 

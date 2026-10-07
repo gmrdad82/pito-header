@@ -1,0 +1,39 @@
+app = "pito-header"
+bin = "demo"
+grid = [76, 13]
+frame = "bare"
+typing = "35ms"
+
+[build]
+command = "cargo build --release --locked --example demo --features crossterm"
+bin_dir = "{target}/release/examples"
+
+[theme]
+name = "pito-header"
+background = "#16181d"
+foreground = "#d8dee9"
+cursor = "#f2c14e"
+selection = "#2c313a"
+black = "#16181d"
+red = "#e06c75"
+green = "#8fc98a"
+yellow = "#f2c14e"
+blue = "#7aa2d6"
+magenta = "#c792ea"
+cyan = "#7fc1c9"
+white = "#d8dee9"
+brightBlack = "#5f6773"
+brightRed = "#ef8a91"
+brightGreen = "#a9dca4"
+brightYellow = "#f7d27a"
+brightBlue = "#9dbbe6"
+brightMagenta = "#d9aef2"
+brightCyan = "#a0d6dc"
+brightWhite = "#ffffff"
+
+[shots.demo]
+kind = "clip"
+line = "The header stepping through groups and sections, drilling into a check and back"
+tape = "render/terminal/demo.tape"
+launch = "demo"
+settle = "1s"
