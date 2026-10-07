@@ -27,3 +27,5 @@ Escape
 Sleep 900ms
 Type "1"
 Sleep 1.2s
+Ctrl+C
+Sleep 2.4s

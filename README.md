@@ -19,7 +19,8 @@ pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.2.0" 
 
 Try it with `cargo run --example demo --features crossterm`: `tab` and
 `shift+tab` change group, `]` and `[` change section, a digit jumps to a
-section, `enter` drills in, `esc` goes back and `q` quits at the top.
+section, `enter` drills in, `esc` goes back and `ctrl+c` pressed twice
+quits.
 
 Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
 (crossterm 0.29); without it the crate has no backend dependency. The

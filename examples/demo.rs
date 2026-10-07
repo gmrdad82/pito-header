@@ -1,4 +1,5 @@
 use std::io;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event};
 use pito_header::{Fact, Group, Header, Key, Nav, Section, Step, Styles};
@@ -13,6 +14,7 @@ use ratatui::{
 const ACCENT: Style = Style::new().fg(Color::Yellow);
 const MUTED: Style = Style::new().fg(Color::DarkGray);
 const STYLES: Styles = Styles::new().accent(ACCENT).muted(MUTED).rule(MUTED);
+const WINDOW: Duration = Duration::from_secs(2);
 
 const ITEMS: [&[&str]; 9] = [
     &[
@@ -38,6 +40,7 @@ struct App {
     nav: Nav,
     selected: usize,
     notice: Option<&'static str>,
+    armed: Option<Instant>,
 }
 
 impl App {
@@ -60,6 +63,7 @@ impl App {
             nav,
             selected: 0,
             notice: None,
+            armed: None,
         }
     }
 
@@ -73,14 +77,25 @@ impl App {
         }
     }
 
-    fn key(&mut self, key: Key) -> bool {
+    fn key(&mut self, key: Key, now: Instant) -> bool {
         self.notice = None;
+        if key == Key::Ctrl('c') {
+            let again = self
+                .armed
+                .take()
+                .is_some_and(|at| now.saturating_duration_since(at) < WINDOW);
+            if again {
+                return false;
+            }
+            self.armed = Some(now);
+            return true;
+        }
+        self.armed = None;
         match self.nav.key(key) {
             Some(Step::Back { selected }) => self.selected = selected,
             Some(Step::Moved(_)) => self.selected = 0,
             Some(_) => {}
             None => match key {
-                Key::Char('q') => return false,
                 Key::Up => self.selected = self.selected.saturating_sub(1),
                 Key::Down => {
                     self.selected = (self.selected + 1).min(self.rows().len().saturating_sub(1))
@@ -115,13 +130,15 @@ impl App {
     fn draw(&self, frame: &mut Frame) {
         let facts = self.facts();
         let notice = self
-            .notice
+            .armed
+            .map(|_| "Press ctrl+c again to quit")
+            .or(self.notice)
             .map(|text| Fact::new(text, Style::new().fg(Color::Magenta)));
         let header = Header::new(&self.nav)
             .styles(STYLES)
             .title(Some("Desk"))
             .left(Some(Fact::new("header demo", MUTED)))
-            .right(Some(Fact::new("q quit", MUTED)))
+            .right(Some(Fact::new("ctrl+c twice quit", MUTED)))
             .facts_pairs(&facts)
             .crumbs(true)
             .closing(true)
@@ -170,8 +187,15 @@ fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
     let mut app = App::new();
     loop {
         terminal.draw(|frame| app.draw(frame))?;
+        let wait = app.armed.map_or(Duration::from_secs(60), |at| {
+            WINDOW.saturating_sub(at.elapsed())
+        });
+        if !event::poll(wait)? {
+            app.armed = None;
+            continue;
+        }
         if let Event::Key(event) = event::read()?
-            && !app.key(Key::from(event))
+            && !app.key(Key::from(event), Instant::now())
         {
             return Ok(());
         }
