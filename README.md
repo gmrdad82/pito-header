@@ -1,5 +1,7 @@
 # pito-header
 
+[![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
+
 ![The demo: groups and numbered sections, drilling into a check and back](docs/demo.gif)
 
 The top of a [PITO](https://pitomd.com) terminal app, as a small ratatui 0.30
@@ -7,6 +9,9 @@ crate: groups of numbered sections drawn as two nested rows, drill-in with a
 breadcrumb, and optional title, facts and notice rows. The look is in the
 style of HEY's terminal UI. It has no app logic and no words of its own: the
 app passes in every name, every style and every key.
+
+It is not on crates.io: add it to your `Cargo.toml` from git, pinned to a
+release tag.
 
 ```toml
 pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.2.0" }
@@ -225,10 +230,21 @@ fn draw(frame: &mut Frame, nav: &Nav) {
 through ratatui's `TestBackend`, a counting allocator holds that drawing and
 hit-testing allocate nothing, and this README's example compiles as a
 doctest) and builds the bench. `bin/gate --fast` leaves the bench build
-out. `bin/demo-gif` records the demo from `render/terminal.toml` and its tape
-into `docs/demo.gif`.
+out, and CI runs it on every push and pull request to main. `bin/demo-gif`
+records the demo from `render/terminal.toml` and its tape into
+`docs/demo.gif`.
+
+## Contributing
+
+Issues and pull requests are welcome. Please read the
+[code of conduct](CODE_OF_CONDUCT.md) first. A change keeps `bin/gate` green
+with no warnings, draws without allocating, and leaves every word, style and
+key to the app. Report a security issue privately, as
+[SECURITY.md](SECURITY.md) says, not in a public issue.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The look is in the style of HEY's terminal UI;
+The code is MIT licensed: see [LICENSE](LICENSE), by Catalin Ilinca. The PITO
+name and its logos are © Catalin Ilinca, all rights reserved, and are not
+covered by the MIT licence. The look is in the style of HEY's terminal UI;
 see [NOTICE.md](NOTICE.md).
