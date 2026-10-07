@@ -10,6 +10,8 @@ breadcrumb, and optional title, facts and notice rows. The look is in the
 style of HEY's terminal UI. It has no app logic and no words of its own: the
 app passes in every name, every style and every key.
 
+## Install and use
+
 It is not on crates.io: add it to your `Cargo.toml` from git, pinned to a
 release tag.
 
@@ -247,5 +249,5 @@ key to the app. Report a security issue privately, as
 
 The code is MIT licensed: see [LICENSE](LICENSE), by Catalin Ilinca. The PITO
 name and its logos are © Catalin Ilinca, all rights reserved, and are not
-covered by the MIT licence. The look is in the style of HEY's terminal UI;
-see [NOTICE.md](NOTICE.md).
+covered by the MIT licence: see [TRADEMARKS.md](TRADEMARKS.md). The look is in
+the style of HEY's terminal UI; see [NOTICE.md](NOTICE.md).
