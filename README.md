@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/demo.gif" alt="The demo: groups and numbered sections, drilling into a check and back">
-</p>
+<p align="center"><img src="docs/demo.gif" alt="The demo: groups and numbered sections, drilling into a check and back"></p>
 
 # pito-header
 
