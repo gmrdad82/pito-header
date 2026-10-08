@@ -1,8 +1,11 @@
+<p align="center">
+  <img src="docs/demo.gif" alt="The demo: groups and numbered sections, drilling into a check and back">
+</p>
+
 # pito-header
 
 [![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
-
-![The demo: groups and numbered sections, drilling into a check and back](docs/demo.gif)
+[![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-header)](https://github.com/gmrdad82/pito-header/tags)
 
 The top of a [PITO](https://pitomd.com) terminal app, as a small ratatui 0.30
 crate: groups of numbered sections drawn as two nested rows, drill-in with a
