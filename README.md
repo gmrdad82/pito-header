@@ -5,6 +5,8 @@
 [![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-header)](https://github.com/gmrdad82/pito-header/tags)
 
+Works on Linux, Windows and macOS (CI-tested on all three).
+
 The top of a [PITO](https://pitomd.com) terminal app, as a small ratatui 0.30
 crate: groups of numbered sections drawn as two nested rows, drill-in with a
 breadcrumb, and optional title, facts and notice rows. The look is in the
