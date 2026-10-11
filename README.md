@@ -2,7 +2,7 @@
 
 # pito-header
 
-[![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
+[![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-header)](https://github.com/gmrdad82/pito-header/tags)
 
 The top of a [PITO](https://pitomd.com) terminal app, as a small ratatui 0.30
@@ -234,7 +234,8 @@ fn draw(frame: &mut Frame, nav: &Nav) {
 through ratatui's `TestBackend`, a counting allocator holds that drawing and
 hit-testing allocate nothing, and this README's example compiles as a
 doctest) and builds the bench. `bin/gate --fast` leaves the bench build
-out, and CI runs it on every push and pull request to main. `bin/demo-gif`
+out. CI runs on Linux, Windows and macOS: `bin/gate --fast` on every
+branch and pull request, and `bin/gate` on main and nightly. `bin/demo-gif`
 records the demo from `render/terminal.toml` and its tape into
 `docs/demo.gif`.
 
