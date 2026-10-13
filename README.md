@@ -7,8 +7,8 @@
 
 Works on Linux, Windows and macOS (CI-tested on all three).
 
-The top of a [PITO](https://pitomd.com) terminal app, as a small ratatui 0.30
-crate: groups of numbered sections drawn as two nested rows, drill-in with a
+The top of a [PITO MD](https://pitomd.com) terminal app, as a small ratatui
+0.30 crate: groups of numbered sections drawn as two nested rows, drill-in with a
 breadcrumb, and optional title, facts and notice rows. The look is in the
 style of HEY's terminal UI. It has no app logic and no words of its own: the
 app passes in every name, every style and every key.
@@ -252,6 +252,6 @@ key to the app. Report a security issue privately, as
 ## Licence
 
 The code is MIT licensed: see [LICENSE](LICENSE), by Catalin Ilinca. The PITO
-name and its logos are © Catalin Ilinca, all rights reserved, and are not
+MD name and its logos are © Catalin Ilinca, all rights reserved, and are not
 covered by the MIT licence: see [TRADEMARKS.md](TRADEMARKS.md). The look is in
 the style of HEY's terminal UI; see [NOTICE.md](NOTICE.md).

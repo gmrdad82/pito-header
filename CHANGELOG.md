@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The brand reads PITO MD in the README, TRADEMARKS.md and the demo GIF's licence note.
+
 ## v0.2.0 — 2026-10-05
 
 ### Added
