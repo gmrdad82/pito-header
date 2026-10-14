@@ -22,3 +22,11 @@ show only this crate's own examples and sample words, no real data.
   output of `cargo run --release --example bench 200000` on 2026-10-14.
 
 `bin/shots` makes them all again.
+
+## The PITO MD logo
+
+`assets/marks/pitomd.svg`, shown at the README's licence section, is the PITO
+MD logo, copied by `bin/marks` from the PITO MD brand masters at
+fe97f221c8c071389283144c416f4fcde87b3958 (see `assets/marks/SOURCE`). It is ©
+Cătălin Ilinca, all rights reserved, and not covered by the MIT licence (see
+TRADEMARKS.md).

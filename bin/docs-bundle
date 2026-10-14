@@ -15,7 +15,7 @@ rm -rf "$stage" "$out"
 mkdir -p "$stage/docs/images"
 cp -R docs/pages/. "$stage/docs/"
 find "$stage/docs" -name '*.md' -exec sed -i "s/@TAG@/$tag/g" {} +
-cp docs/images/*.png docs/images/*.gif "$stage/docs/images/"
+cp docs/images/*.png docs/images/*.gif assets/marks/*.svg "$stage/docs/images/"
 {
     printf -- '---\ntitle: Changelog\ndescription: What changed in each pito-header release.\nsidebar:\n  order: 90\n---\n'
     sed '1{/^# /d}' CHANGELOG.md
@@ -24,7 +24,7 @@ cargo doc --no-deps --all-features --locked
 cp -R "${CARGO_TARGET_DIR:-target}/doc" "$stage/docs/api"
 rm -f "$stage/docs/api/.lock"
 sed -i -E \
-    -e 's#src="docs/images/#src="../../images/#g' \
+    -e 's#src="(docs/images|assets/marks)/#src="../../images/#g' \
     -e "s#href=\"(LICENSE|NOTICE\\.md|TRADEMARKS\\.md|SECURITY\\.md|CODE_OF_CONDUCT\\.md|docs/images/[^\"]*)\"#href=\"$blob/\\1\"#g" \
     "$stage/docs/api/pito_header/index.html"
 if grep -rIl -e "$HOME" -e "$(hostname)" "$stage" >&2; then
