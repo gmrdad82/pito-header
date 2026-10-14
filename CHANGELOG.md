@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.1 — 2026-10-14
+
+The crate's code and API are the same as 1.0.0.
+
+### Added
+
+- Docs pages for the PITO MD docs site: install and a quick start, a guide for each task (groups and numbered sections, keys, fitting the width, drill-in, the optional rows, styled sections, clicks and the bench) and the API reference. Every GitHub Release from this one on carries them as `docs-vX.Y.Z.tar.gz`.
+
+### Fixed
+
+- The README no longer says `Styles` is `#[non_exhaustive]`; its fields are plain.
+
 ## v1.0.0 — 2026-10-14
 
 pito-header is 1.0. The crate's code and API are the same as 0.2.0, so moving up needs no change in your app.
