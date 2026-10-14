@@ -1,17 +1,20 @@
 # Changelog
 
-## Unreleased
+## v1.0.0 — 2026-10-14
+
+pito-header is 1.0. The crate's code and API are the same as 0.2.0, so moving up needs no change in your app.
 
 ### Added
 
-- Two new examples to try: `fit` narrows and widens the header so you can watch it abbreviate, and `gallery` shows every optional row, sections in several styles and the breadcrumb at three widths.
-- The bench measures five cases: the nav rows alone, the full header, drilled in, abbreviated at 40 columns, and a click hit-test.
+- Two examples to try: `cargo run --example fit --features crossterm` narrows and widens the header so you can watch it abbreviate, and `gallery` shows every optional row, sections in several styles and the breadcrumb at three widths.
+- The bench measures five cases: the nav rows alone, the full header, drilled in, abbreviated at 40 columns, and a click hit-test. The full header draws in 8.7 µs at 150 columns on a Ryzen 9 9950X.
 
 ### Changed
 
-- The README shows every feature with a GIF or a still, leads with measured numbers (8.7 µs to draw the full header at 150 columns, no allocation while drawing, three dependencies) and has a 30-second install and first use.
-
-- The brand reads PITO MD in the README, TRADEMARKS.md and the demo GIF's licence note.
+- The README shows every feature with a GIF or a still, leads with measured numbers and has a 30-second install and first use.
+- The demo quits on ctrl+c pressed twice, as every PITO MD terminal app does.
+- CI tests every change on Linux, Windows and macOS.
+- The brand reads PITO MD, and the names and logos are covered in TRADEMARKS.md, with LICENSE the plain MIT text.
 
 ## v0.2.0 — 2026-10-05
 
