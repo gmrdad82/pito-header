@@ -23,10 +23,10 @@ show only this crate's own examples and sample words, no real data.
 
 `bin/shots` makes them all again.
 
-## The PITO MD logo
+## The PITO MD wordmark
 
-`assets/marks/pitomd.svg`, shown at the README's licence section, is the PITO
-MD logo, copied by `bin/marks` from the PITO MD brand masters at
-fe97f221c8c071389283144c416f4fcde87b3958 (see `assets/marks/SOURCE`). It is ©
+`assets/marks/wordmark.svg`, shown at the README's licence section, is the PITO
+MD wordmark, copied by `bin/marks` from the PITO MD brand masters at
+aa3aee8b232a1b848995bf3d9a012a01d4aff8ec (see `assets/marks/SOURCE`). It is ©
 Cătălin Ilinca, all rights reserved, and not covered by the MIT licence (see
 TRADEMARKS.md).
