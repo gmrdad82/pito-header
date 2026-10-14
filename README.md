@@ -243,9 +243,9 @@ Header::new(&nav).styles(..).title(..).left(..).right(..).tabs(bool).lit(bool)
   .closing(bool).notice(Option<Fact>).drill(Drill); height(), hit(..)
 ```
 
-Every public enum, and `NavKeys` and `Styles`, are `#[non_exhaustive]`: match
-them with a wildcard arm, and build the structs with `new()`, `HEY` or `NONE`
-and their methods, so a later release can add to them in a minor version.
+Every public enum, and `NavKeys`, are `#[non_exhaustive]`: match them with a
+wildcard arm, and build a `NavKeys` from `HEY` or `NONE` and its methods, so a
+later release can add to them in a minor version.
 
 ## A fuller example
 
@@ -319,6 +319,10 @@ out. CI runs on Linux, Windows and macOS: `bin/gate --fast` on every
 branch and pull request, and `bin/gate` on main and nightly. `bin/shots`
 records the GIFs and stills in `docs/images/` from `render/terminal.toml`
 and its tapes with prec and pconv, and draws the chart with pito-compare.
+`bin/docs-bundle` builds the crate's pages for the PITO MD docs site from
+`docs/pages/`, `CHANGELOG.md` and `cargo doc` into
+`tmp/docs-vX.Y.Z.tar.gz`, and the release workflow attaches it to every
+tag's GitHub Release.
 
 ## Contributing
 

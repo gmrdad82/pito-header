@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+tag=${1:-v$version}
+if [ "$tag" != "v$version" ]; then
+    echo "docs-bundle: tag $tag does not match Cargo.toml's version $version" >&2
+    exit 1
+fi
+grep -q "^## $tag " CHANGELOG.md || { echo "docs-bundle: CHANGELOG.md has no $tag section" >&2; exit 1; }
+blob=https://github.com/gmrdad82/pito-header/blob/$tag
+stage=tmp/docs-bundle
+out=tmp/docs-$tag.tar.gz
+rm -rf "$stage" "$out"
+mkdir -p "$stage/docs/images"
+cp -R docs/pages/. "$stage/docs/"
+find "$stage/docs" -name '*.md' -exec sed -i "s/@TAG@/$tag/g" {} +
+cp docs/images/*.png docs/images/*.gif "$stage/docs/images/"
+{
+    printf -- '---\ntitle: Changelog\ndescription: What changed in each pito-header release.\nsidebar:\n  order: 90\n---\n'
+    sed '1{/^# /d}' CHANGELOG.md
+} > "$stage/docs/changelog.md"
+cargo doc --no-deps --all-features --locked
+cp -R "${CARGO_TARGET_DIR:-target}/doc" "$stage/docs/api"
+rm -f "$stage/docs/api/.lock"
+sed -i -E \
+    -e 's#src="docs/images/#src="../../images/#g' \
+    -e "s#href=\"(LICENSE|NOTICE\\.md|TRADEMARKS\\.md|SECURITY\\.md|CODE_OF_CONDUCT\\.md|docs/images/[^\"]*)\"#href=\"$blob/\\1\"#g" \
+    "$stage/docs/api/pito_header/index.html"
+if grep -rIl -e "$HOME" -e "$(hostname)" "$stage" >&2; then
+    echo "docs-bundle: a local path or host name reached the bundle" >&2
+    exit 1
+fi
+tar -czf "$out" --owner=0 --group=0 --numeric-owner -C "$stage" docs
+echo "$out"

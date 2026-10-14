@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+      - run: bash bin/docs-bundle "$GITHUB_REF_NAME"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$GITHUB_REF_NAME
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            {
+              awk -v tag="$tag" '$1 == "##" && $2 == tag { on = 1; next } $1 == "##" && on { exit } on' CHANGELOG.md
+              printf 'Pin it in `Cargo.toml`:\n\n```toml\npito-header = { git = "https://github.com/%s", tag = "%s" }\n```\n' "$GITHUB_REPOSITORY" "$tag"
+            } > tmp/notes.md
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --title "pito-header ${tag#v}" --notes-file tmp/notes.md
+          fi
+          gh release upload "$tag" "tmp/docs-$tag.tar.gz" --repo "$GITHUB_REPOSITORY" --clobber
