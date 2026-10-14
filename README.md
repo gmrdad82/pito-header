@@ -1,61 +1,180 @@
-<p align="center"><img src="docs/demo.gif" alt="The demo: groups and numbered sections, drilling into a check and back"></p>
+<p align="center"><img src="docs/images/demo.gif" alt="The demo: stepping through groups and numbered sections, drilling into a nightly check and back, and the double ctrl+c quit hint"></p>
 
 # pito-header
 
 [![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-header)](https://github.com/gmrdad82/pito-header/tags)
 
+The top of a [PITO MD](https://pitomd.com) terminal app, as a small
+[ratatui](https://ratatui.rs) 0.30 crate: groups of numbered sections in two
+nested rows, drill-in with a breadcrumb, and optional title, facts and notice
+rows, all abbreviating to fit the width. It has no app logic and no words of
+its own: the app passes in every name, every style and every key.
+
 Works on Linux, Windows and macOS (CI-tested on all three).
 
-The top of a [PITO MD](https://pitomd.com) terminal app, as a small ratatui
-0.30 crate: groups of numbered sections drawn as two nested rows, drill-in with a
-breadcrumb, and optional title, facts and notice rows. The look is in the
-style of HEY's terminal UI. It has no app logic and no words of its own: the
-app passes in every name, every style and every key.
+## At a glance
 
-## Install and use
+| | |
+|---|---|
+| Full header, drawn at 150 columns | **8.7 µs** a frame (mean of 200,000) |
+| Nav rows alone / a click hit-test | **2.1 µs** / **0.11 µs** |
+| Allocations while drawing or hit-testing | **0** (a counting allocator in the tests holds it) |
+| Dependencies | **3**: ratatui, unicode-segmentation, unicode-width; no terminal backend unless you turn on `crossterm` |
+| Size | **about 1,540 lines** of Rust, 75 tests |
+| Build | **22 s** clean in release with every dependency, **0.5 s** for the crate itself |
 
-It is not on crates.io: add it to your `Cargo.toml` from git, pinned to a
-release tag.
+Measured on 2026-10-14 on an AMD Ryzen 9 9950X with Rust 1.97.1:
+`cargo run --release --example bench 200000` for the times, a clean
+`cargo build --release --lib` and a rebuild after touching the crate for the
+build. The chart under [Fast](#fast) has every case.
 
-```toml
-pito-header = { git = "https://github.com/gmrdad82/pito-header", tag = "v0.2.0" }
+## Install and first use
+
+Add it from git, pinned to a release tag (it is not on crates.io). The same
+line works on Linux, Windows and macOS:
+
+```sh
+cargo add ratatui
+cargo add pito-header --git https://github.com/gmrdad82/pito-header --tag v0.2.0
 ```
 
-Try it with `cargo run --example demo --features crossterm`: `tab` and
-`shift+tab` change group, `]` and `[` change section, a digit jumps to a
-section, `enter` drills in, `esc` goes back and `ctrl+c` pressed twice
-quits.
+Then build a nav, feed it keys and draw it:
 
-Turn on the `crossterm` feature for `Key::from(crossterm::event::KeyEvent)`
-(crossterm 0.29); without it the crate has no backend dependency. The
-conversion keeps Alt apart (`Key::Alt('q')` is not `Key::Char('q')`, so Alt+q
-is not Back), turns Alt, Super, Meta or Hyper on any other key into
-`Key::Other`, and passes Ctrl+Alt plus a character on as that character, which
-is how AltGr arrives on some platforms, so diacritics can still be typed.
+```rust,standalone_crate
+use pito_header::{Group, Header, Key, Nav, Section};
+use ratatui::{Frame, layout::Rect};
 
-## What it does
+let mut nav = Nav::new(vec![
+    Group::new("Mail").section(Section::new("Inbox")).section(Section::new("Drafts")),
+    Group::new("Work").section(Section::new("Checks")),
+]);
+nav.key(Key::Char('3'));
+assert_eq!(nav.place().number, 3);
 
-- **Groups and numbered sections, as data.** Sections are numbered 1, 2, 3…
-  across all groups, so a digit jumps anywhere; `0` is the tenth, and its label
-  draws `0`.
-- **Two nested rows,** the groups over the current group's sections,
-  centred, the current one in the accent and bold. When the width runs out
-  they abbreviate step by step and never wrap: full names, then each
-  section's short name, then only the current one named, then numbers only.
-  A group falls back to its short name, then its first letter.
-- **Drill-in.** `open(title, selected)` goes one level deeper and remembers
-  the list's selection; back returns it, so the list comes back where it
-  was. Each section keeps its own stack while you move around. While drilled
-  in, the header swaps the sections row for the breadcrumb rule, as HEY
-  does (see [Drilling in](#drilling-in)). The breadcrumb ("Checks /
-  nightly") elides the middle, then the head, when it doesn't fit.
-- **Keys map to actions; nothing is taken behind the app's back.**
-  `action(key)` only looks; `apply(action)` moves; `key(key)` does both.
-  Every key set is configurable through `NavKeys` (`NavKeys::NONE` takes
-  nothing), so `tab`, `[ ]`, digits or `q` can keep other meanings in an app.
-  Back at the top level is never an action, so `esc` stays the app's there.
-  With a single group, `tab` steps sections.
+fn draw(frame: &mut Frame, nav: &Nav) {
+    let area = frame.area();
+    let header = Header::new(nav).title(Some("Desk"));
+    frame.render_widget(header, Rect { height: header.height(), ..area });
+}
+```
+
+To see it move, clone the repository and run the demo at the top of this page:
+
+```sh
+git clone https://github.com/gmrdad82/pito-header && cd pito-header
+cargo run --example demo --features crossterm
+```
+
+`tab` and `shift+tab` change group, `]` and `[` change section, a digit
+jumps to a section, `enter` drills in, `esc` goes back and `ctrl+c` pressed
+twice quits.
+
+## Groups and numbered sections
+
+Sections are numbered 1, 2, 3… across all groups, so a digit jumps anywhere
+(`0` is the tenth). The groups row sits over the current group's sections,
+centred, the current one in the accent and bold, and every group remembers
+its section. The GIF at the top is `examples/demo.rs`.
+
+Keys map to actions, and nothing is taken behind the app's back:
+`action(key)` only looks, `apply(action)` moves, and `key(key)` does both.
+Every key set is configurable through `NavKeys` (`NavKeys::NONE` takes
+nothing), so `tab`, `[ ]`, digits or `q` can keep other meanings in an app,
+and back at the top level is never an action, so `esc` stays the app's there.
+
+## Fits any width
+
+<p align="center"><img src="docs/images/fit.gif" alt="The header narrowing two columns at a time from 76 to 8 and widening back: full names, then short names, then only the current section named, then numbers only, while the groups go to short names and first letters"></p>
+
+When the width runs out, the rows abbreviate step by step and never wrap:
+full names, then each section's short name, then only the current one named,
+then numbers only. A group falls back to its short name, then its first
+letter. Facts elide with "…", and the title's side slots drop before the
+title does. Widths are measured per cell with Unicode widths, so diacritics
+(ă, î, ș, ț), "…" and wide glyphs clip cleanly. This is `examples/fit.rs`.
+
+## Drill-in with a breadcrumb
+
+<p align="center"><img src="docs/images/drill.png" alt="Three headers drilled two levels into Checks: at 76 columns the breadcrumb reads Checks / nightly / step 3: test, at 30 columns Checks / … / step 3: test, and at 20 columns … / step 3: test with the groups as first letters"></p>
+
+`open(title, selected)` goes one level deeper and remembers the list's
+selection; back returns it, so the list comes back where it was. Each section
+keeps its own stack while you move around. While drilled in, the header
+swaps the sections row for a breadcrumb rule, as HEY's terminal UI does, and
+the breadcrumb elides its middle, then its head, when it doesn't fit.
+
+```rust,standalone_crate
+use pito_header::{Drill, Group, Header, Nav, Section};
+
+let mut nav = Nav::new(vec![
+    Group::new("Library").section(Section::new("Ownership")),
+    Group::new("Work").section(Section::new("Checks")),
+]);
+nav.open("build queue", 3);
+assert_eq!(Header::new(&nav).crumbs(true).height(), 2);
+assert_eq!(Header::new(&nav).crumbs(true).drill(Drill::Rows).height(), 3);
+assert_eq!(nav.back(), Some(3));
+```
+
+Back brings the sections row back with the selection kept, and clicks on the
+breadcrumb rule hit nothing. An app that wants the breadcrumb on a row of its
+own passes `.drill(Drill::Rows)`; the `Breadcrumb` widget stays for apps
+that title their own content.
+
+## Every row is optional
+
+<p align="center"><img src="docs/images/rows.png" alt="A full header: a title rule reading Desk with trial 9 days left on the left and ? help on the right, the groups, the sections with 2 Drafts lit, a facts rule reading 3 drafts, 1 scheduled, synced just now, a closing rule and a confirm question, Delete the 3 drafts? y/n"></p>
+
+`Header` draws only the rows it's given: a title rule with the name in the
+middle and a left and a right slot, the nav rows, a facts row (on a rule or
+plain, each fact styled by the app), a closing rule, and a notice row for a
+result, a warning or a confirm question. A slot can hold several styles side
+by side (`left_parts`), and text on a rule carries exactly its own style: the
+rule's DIM never leaks into it. A header with no sections (a dashboard)
+draws only its other rows. This is `examples/gallery.rs rows`.
+
+## Sections in several styles
+
+<p align="center"><img src="docs/images/spans.png" alt="A Fleet header: under Hosts, the sections web-1 up and web-2 up with green dots, db down with a red dot and lit as current, and cache busy with a yellow dot; the facts rule reads 2 up, 1 down, 1 busy, checked 4s ago"></p>
+
+`Section::spans` gives a section several styled spans, such as a host's name
+next to its state, and `section_mut(..).set_spans(..)` changes it in place
+while the app runs, keeping the place, every group's remembered section and
+every drill stack. Each span draws over the cell's style, so the current
+section keeps its accent and bold. This is `examples/gallery.rs spans`.
+
+## Clicks
+
+The crate never reads the mouse; it answers where a click landed.
+`hit(area, column, row)` names the group or section under the pointer, and
+nothing outside the area:
+
+```rust,standalone_crate
+use pito_header::{Header, Nav};
+use ratatui::layout::Rect;
+
+fn click(nav: &mut Nav, area: Rect, column: u16, row: u16) {
+    let place = Header::new(nav).title(Some("Desk")).hit(area, column, row);
+    if let Some(place) = place {
+        nav.go_to(place.group, place.section);
+    }
+}
+```
+
+## Fast
+
+<p align="center"><img src="docs/images/draw-time-bars.png" width="640" alt="Draw time per frame in microseconds, lower is better, Ryzen 9 9950X, Rust 1.97.1, mean of 200,000 frames: at 150 columns nav rows only 2.1, full header 8.7, full header drilled in 4.2, hit test one click 0.1; at 40 columns full header abbreviated 4.5"></p>
+
+Drawing writes straight into ratatui's buffer: no allocation, no clock, no
+input and no randomness, so a frame costs microseconds and the same state
+always draws the same cells. Run `cargo run --release --example bench
+200000` for these numbers on your machine; the chart is drawn by
+[pito-compare](https://github.com/gmrdad82/pito-compare) from
+[docs/images/draw-time.toml](docs/images/draw-time.toml).
+
+## Behaviour in detail
+
 - **Digits past the last section** do nothing and fall through to the app,
   unless `swallow_digits` is on: then they map to `Action::Swallow`, which
   `apply` answers with `Step::Swallowed`, so the key is taken and nothing
@@ -63,53 +182,29 @@ is how AltGr arrives on some platforms, so diacritics can still be typed.
 - **`cycle(by)` and `step(by)`** move by the size of `by` (negative goes
   back) and wrap. `cycle` counts filled groups only and answers `None` when
   there is no other group to go to; `cycle(0)` and `step(0)` stay where they
-  are and answer the place.
-- **Every group remembers its section:** `selected(group)` reads it from
-  anywhere, so the app can jump to a group at its remembered section with
-  `go_to(group, section)`, or show another group's section.
-- **A header with no sections** (a dashboard) draws only the rows it's given.
-- **Optional rows** in `Header`: a title rule with the name in the middle
-  and a left and a right slot (they drop when there's no room), the nav
-  rows, a facts row (each fact styled by the app, on a rule or plain), the
-  breadcrumb rule, a closing rule, and a notice row (a result, a warning, or
-  a confirm question). Text on a rule (the title, its slots, the facts, the
-  breadcrumb) carries exactly its own style: the rule's modifiers, such as
-  DIM, never leak into it.
-- **A slot in several styles:** `left_parts` and `right_parts` take a
-  slice of facts drawn side by side, such as a muted label and an accent
-  value; when the slot is cut, the ellipsis takes the style of the part it
-  cuts. The last call of `left`/`left_parts` (or `right`/`right_parts`)
-  wins.
-- **Styled sections.** `Section::spans` gives a section several styled spans,
-  such as a host name next to its state. Each span draws in its own style over
-  the cell's, so the selected section keeps its accent and bold on the whole
-  cell, a span with no colour of its own takes the cell's, and `short` still
-  sets the abbreviation as plain text. `short_spans` sets it as styled spans
-  instead, drawn the same way in the short and lone forms; the last of the two
-  calls wins. Abbreviation and clipping work as for a plain label, and a click
-  anywhere on the cell lands on the section.
-- **A label that changes while the app runs:** `nav.section_mut(group,
-  section)` hands out the section, and `set_name`, `set_spans`, `set_short`
-  and `set_short_spans` change its label in place, so the current place, every
-  group's remembered section and every section's drill stack stay.
+  are and answer the place. With a single group, `tab` steps sections.
+- **`selected(group)`** reads any group's remembered section, so the app can
+  jump to a group at its remembered section with `go_to(group, section)`.
 - **Texts the app owns as `String`s:** `facts_pairs`, `left_pairs` and
   `right_pairs` take a slice of `(String, Style)` and draw it like the
   `Fact` forms, so the app needs no parallel `Vec<Fact>` each frame.
-- **Empty facts are skipped,** and a row of only empty facts takes no row. The
-  row elides with "…" only when the room left cannot hold the separator and
-  the next fact's first two cells (or the whole fact, if it is narrower); a cut
-  fact ends the row. An empty `title` is no title.
+- **Empty facts are skipped,** and a row of only empty facts takes no row.
+  The row elides with "…" only when the room left cannot hold the separator
+  and the next fact's first two cells; a cut fact ends the row. An empty
+  `title` is no title. When a slot is cut, the ellipsis takes the style of
+  the part it cuts.
 - **Control characters take no cell:** a newline, tab or carriage return
-  inside a text is measured and drawn as one space between its two sides, and
-  one at either end is dropped, so a multi-line message reads as one line.
-- **Clicks:** `hit(area, column, row)` names the group or section under the
-  pointer, and nothing outside the area; the crate never reads the mouse
-  itself.
-- **Widths by cell:** Unicode widths throughout, so diacritics (ă, î, ș, ț),
-  "…" and wide glyphs measure and clip cleanly.
-- **Cheap:** drawing writes straight into the buffer, with no allocation
-  and no clock; well under a millisecond at 150×40 (`cargo run --release
-  --example bench`).
+  inside a text is drawn as one space, and one at either end is dropped, so
+  a multi-line message reads as one line.
+- **`lit(false)`** keeps the group lit but dims the current section, for a
+  page that sits over every section (help, settings). `underline(true)`
+  underlines the section numbers.
+- **The `crossterm` feature** adds `Key::from(crossterm::event::KeyEvent)`
+  (crossterm 0.29). It keeps Alt apart (`Key::Alt('q')` is not
+  `Key::Char('q')`, so Alt+q is not Back), turns Alt, Super, Meta or Hyper
+  on any other key into `Key::Other`, and passes Ctrl+Alt plus a character
+  on as that character, which is how AltGr arrives on some platforms, so
+  diacritics can still be typed.
 
 ## The API
 
@@ -152,45 +247,7 @@ Every public enum, and `NavKeys` and `Styles`, are `#[non_exhaustive]`: match
 them with a wildcard arm, and build the structs with `new()`, `HEY` or `NONE`
 and their methods, so a later release can add to them in a minor version.
 
-`lit(false)` keeps the group lit but dims the current section, for a page
-that sits over every section (help, settings). `underline(true)` underlines
-the section numbers.
-
-## Drilling in
-
-When the nav is drilled in (`depth() > 0`), `Header` draws the way HEY's
-terminal UI does: the title rule and the groups row stay, the sections row
-becomes a rule with the breadcrumb centred in the accent, and the facts and
-breadcrumb rows step aside, so `height()` shrinks by them. Back brings the
-sections row back with the selection kept. Clicks on the breadcrumb rule hit
-nothing. An app that needs the separate rows passes `.drill(Drill::Rows)`;
-the `Breadcrumb` widget stays for apps that title their own content.
-
-```rust,standalone_crate
-use pito_header::{Drill, Group, Header, Nav, Section};
-
-let mut nav = Nav::new(vec![
-    Group::new("Library").section(Section::new("Ownership")),
-    Group::new("Work").section(Section::new("Checks")),
-]);
-nav.open("build queue", 3);
-assert_eq!(Header::new(&nav).crumbs(true).height(), 2);
-assert_eq!(Header::new(&nav).crumbs(true).drill(Drill::Rows).height(), 3);
-assert_eq!(nav.back(), Some(3));
-```
-
-```text
-────────────────────────── Desk ──────────────────────────
-                 Mail    Library    Work
-       4 Items & notes  5 Collections  6 Ownership
-────────────── 12 owners · synced just now ───────────────
-
-────────────────────────── Desk ──────────────────────────
-                 Mail    Library    Work
-──────────────── Ownership / build queue ─────────────────
-```
-
-## Example
+## A fuller example
 
 ```rust,standalone_crate
 use pito_header::{Fact, Group, Header, Key, Nav, Section, Step, Styles};
@@ -229,17 +286,39 @@ fn draw(frame: &mut Frame, nav: &Nav) {
 }
 ```
 
+
+## Part of PITO MD
+
+pito-header is one of the ratatui crates behind [PITO MD](https://pitomd.com)'s
+terminal apps:
+
+- [pito-tui](https://github.com/gmrdad82/pito-tui): the app shell that brings
+  this header, the footer, the hourglass and the list in one pin, with the
+  paced loop, key routing and the quit guard.
+- [pito-footer](https://github.com/gmrdad82/pito-footer): the bottom of the
+  app: key hints that fit the width, a notice line, a y/n confirm, a one-line
+  input and the double ctrl+c quit guard.
+- [pito-list](https://github.com/gmrdad82/pito-list): selectable list rows
+  with columns that drop by priority, scrolling, paging and click hits.
+- [pito-hourglass](https://github.com/gmrdad82/pito-hourglass): an hourglass
+  to show while data loads.
+
+The GIFs and stills on this page are recorded with
+[prec](https://github.com/gmrdad82/prec) and made with
+[pconv](https://github.com/gmrdad82/pconv), and the chart is drawn by
+[pito-compare](https://github.com/gmrdad82/pito-compare).
+
 ## Development
 
 `bin/gate` runs `cargo fmt --check`, `cargo clippy --all-targets
 --all-features -- -D warnings`, `cargo test --all-features` (the tests draw
 through ratatui's `TestBackend`, a counting allocator holds that drawing and
-hit-testing allocate nothing, and this README's example compiles as a
-doctest) and builds the bench. `bin/gate --fast` leaves the bench build
+hit-testing allocate nothing, and this README's examples compile as
+doctests) and builds the bench. `bin/gate --fast` leaves the bench build
 out. CI runs on Linux, Windows and macOS: `bin/gate --fast` on every
-branch and pull request, and `bin/gate` on main and nightly. `bin/demo-gif`
-records the demo from `render/terminal.toml` and its tape into
-`docs/demo.gif`.
+branch and pull request, and `bin/gate` on main and nightly. `bin/shots`
+records the GIFs and stills in `docs/images/` from `render/terminal.toml`
+and its tapes with prec and pconv, and draws the chart with pito-compare.
 
 ## Contributing
 
@@ -254,4 +333,5 @@ key to the app. Report a security issue privately, as
 The code is MIT licensed: see [LICENSE](LICENSE), by Catalin Ilinca. The PITO
 MD name and its logos are © Catalin Ilinca, all rights reserved, and are not
 covered by the MIT licence: see [TRADEMARKS.md](TRADEMARKS.md). The look is in
-the style of HEY's terminal UI; see [NOTICE.md](NOTICE.md).
+the style of HEY's terminal UI; see [NOTICE.md](NOTICE.md), which also names
+the images in `docs/images/` and their sources.

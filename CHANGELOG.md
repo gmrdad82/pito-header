@@ -2,7 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Two new examples to try: `fit` narrows and widens the header so you can watch it abbreviate, and `gallery` shows every optional row, sections in several styles and the breadcrumb at three widths.
+- The bench measures five cases: the nav rows alone, the full header, drilled in, abbreviated at 40 columns, and a click hit-test.
+
 ### Changed
+
+- The README shows every feature with a GIF or a still, leads with measured numbers (8.7 µs to draw the full header at 150 columns, no allocation while drawing, three dependencies) and has a 30-second install and first use.
 
 - The brand reads PITO MD in the README, TRADEMARKS.md and the demo GIF's licence note.
 

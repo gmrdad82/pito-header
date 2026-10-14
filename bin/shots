@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root=$PWD
+bin=$root/target/release/examples
+out=tmp/renders
+cargo build --release --locked --examples --features crossterm
+for shot in demo fit; do
+    prec clip pito-header "$shot" --app-dir "$root" --bin "$bin" --size 1280x512 --fps 30 --no-archive --out "$out"
+    pconv "$out/pito-header/clip/pito-header-clip-$shot-1280x512-30fps.master.mp4" "docs/images/$shot.gif" --size 1280 --fps 15 --force --no-progress
+done
+still() {
+    prec still pito-header "$1" --app-dir "$root" --bin "$bin" --size "1280x$3" --set "grid=76x$2" --no-archive --out "$out"
+    cp "$out/pito-header/still/pito-header-still-$1-1280x$3.png" "docs/images/$1.png"
+}
+still rows 8 315
+still spans 6 236
+still drill 12 472
+pcmp docs/images/draw-time.toml --kind bars --out docs/images
