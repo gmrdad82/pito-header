@@ -12,9 +12,11 @@ like the code (see LICENSE); each carries a `.license` file beside it. They
 show only this crate's own examples and sample words, no real data.
 
 - `demo.gif`: `examples/demo.rs`, recorded with prec from `render/terminal.toml`
-  and `render/terminal/demo.tape`, made with pconv.
+  and `render/terminal/demo.tape`, made with pcod
+  ([pito-codecs](https://github.com/gmrdad82/pito-codecs)).
 - `fit.gif`: `examples/fit.rs`, recorded with prec from
-  `render/terminal/fit.tape`, made with pconv.
+  `render/terminal/fit.tape`, made with pcod
+  ([pito-codecs](https://github.com/gmrdad82/pito-codecs)).
 - `rows.png`, `spans.png`, `drill.png`: `examples/gallery.rs` with the
   argument `rows`, `spans` or `drill`, stills by prec from
   `render/terminal/still.tape`.

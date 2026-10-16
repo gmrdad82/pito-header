@@ -305,8 +305,8 @@ terminal apps:
 
 The GIFs and stills on this page are recorded with
 [prec](https://github.com/gmrdad82/prec) and made with
-[pconv](https://github.com/gmrdad82/pconv), and the chart is drawn by
-[pito-compare](https://github.com/gmrdad82/pito-compare).
+pcod from [pito-codecs](https://github.com/gmrdad82/pito-codecs), and the
+chart is drawn by [pito-compare](https://github.com/gmrdad82/pito-compare).
 
 ## Development
 
@@ -318,7 +318,7 @@ doctests) and builds the bench. `bin/gate --fast` leaves the bench build
 out. CI runs on Linux, Windows and macOS: `bin/gate --fast` on every
 branch and pull request, and `bin/gate` on main and nightly. `bin/shots`
 records the GIFs and stills in `docs/images/` from `render/terminal.toml`
-and its tapes with prec and pconv, and draws the chart with pito-compare.
+and its tapes with prec and pcod, and draws the chart with pito-compare.
 `bin/docs-bundle` builds the crate's pages for the PITO MD docs site from
 `docs/pages/`, `CHANGELOG.md` and `cargo doc` into
 `tmp/docs-vX.Y.Z.tar.gz`, and the release workflow attaches it to every
