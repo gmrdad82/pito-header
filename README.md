@@ -2,7 +2,6 @@
 
 # pito-header
 
-[![CI](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gmrdad82/pito-header/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/gmrdad82/pito-header)](https://github.com/gmrdad82/pito-header/tags)
 
 The top of a [PITO MD](https://pitomd.com) terminal app, as a small
@@ -11,7 +10,7 @@ nested rows, drill-in with a breadcrumb, and optional title, facts and notice
 rows, all abbreviating to fit the width. It has no app logic and no words of
 its own: the app passes in every name, every style and every key.
 
-Works on Linux, Windows and macOS (CI-tested on all three).
+Works on Linux, Windows and macOS.
 
 ## At a glance
 
@@ -315,14 +314,12 @@ chart is drawn by [pito-compare](https://github.com/gmrdad82/pito-compare).
 through ratatui's `TestBackend`, a counting allocator holds that drawing and
 hit-testing allocate nothing, and this README's examples compile as
 doctests) and builds the bench. `bin/gate --fast` leaves the bench build
-out. CI runs on Linux, Windows and macOS: `bin/gate --fast` on every
-branch and pull request, and `bin/gate` on main and nightly. `bin/shots`
+out. `bin/shots`
 records the GIFs and stills in `docs/images/` from `render/terminal.toml`
 and its tapes with prec and pcod, and draws the chart with pito-compare.
 `bin/docs-bundle` builds the crate's pages for the PITO MD docs site from
 `docs/pages/`, `CHANGELOG.md` and `cargo doc` into
-`tmp/docs-vX.Y.Z.tar.gz`, and the release workflow attaches it to every
-tag's GitHub Release.
+`tmp/docs-vX.Y.Z.tar.gz`, which every tag's GitHub Release carries.
 
 ## Contributing
 

@@ -13,7 +13,7 @@ two nested rows, drill-in with a breadcrumb, and optional title, facts and
 notice rows, all abbreviating to fit the width. It has no app logic and no
 words of its own: the app passes in every name, every style and every key.
 
-It works on Linux, Windows and macOS, and CI tests it on all three.
+It works on Linux, Windows and macOS.
 
 ## At a glance
 
