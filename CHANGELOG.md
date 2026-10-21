@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.0 — 2026-10-21
+
+### Added
+
+- `NavKeys::zero_first`: with it on, `0` jumps to the first section and `1` to `9` to the second through the tenth, and the section labels show those digits. A section past the tenth has no digit on its label and is reached with `]`, `[` and the group keys. Off by default, so `0` stays the tenth in every app that doesn't turn it on.
+
+### Changed
+
+- The README's licence section shows the PITO MD wordmark.
+- The README's GIFs are made with pcod (pito-codecs), which replaced pconv.
+- Builds, tests and releases run on the maintainer's machines; the README no longer carries a CI badge.
+- The README has a line on asking questions on Discord, and its install line names v1.1.0.
+
 ## v1.0.1 — 2026-10-14
 
 The crate's code and API are the same as 1.0.0.
