@@ -1,7 +1,7 @@
 mod common;
 
-use common::nav;
-use pito_header::{Action, Group, Key, Nav, NavKeys, Place, Section, Step};
+use common::{STYLES, draw, nav};
+use pito_header::{Action, Group, Key, Nav, NavBar, NavKeys, Place, Section, Step};
 
 fn place(group: usize, section: usize, number: usize) -> Place {
     Place {
@@ -91,6 +91,31 @@ fn zero_is_the_tenth_section() {
     })]);
     assert_eq!(nav.action(Key::Char('0')), Some(Action::Go(10)));
     assert_eq!(nav.key(Key::Char('0')), Some(Step::Moved(place(0, 9, 10))));
+}
+
+#[test]
+fn zero_first_keys_and_labels_start_at_zero() {
+    let eleven = || {
+        Nav::new(vec![(1..=11).fold(Group::new("All"), |group, n| {
+            group.section(Section::new(format!("S{n}")))
+        })])
+    };
+    let mut nav = eleven().keys(NavKeys::HEY.zero_first(true));
+    assert_eq!(nav.action(Key::Char('0')), Some(Action::Go(1)));
+    assert_eq!(nav.action(Key::Char('1')), Some(Action::Go(2)));
+    assert_eq!(nav.key(Key::Char('9')), Some(Step::Moved(place(0, 9, 10))));
+    assert_eq!(nav.key(Key::Char(']')), Some(Step::Moved(place(0, 10, 11))));
+    let row = draw(NavBar::new(&nav).styles(STYLES), 120, 1).text[0].clone();
+    assert!(row.trim().starts_with("0 S1  1 S2  "), "{row}");
+    assert!(row.contains("  9 S10  S11"), "{row}");
+    let row = draw(NavBar::new(&eleven()).styles(STYLES), 120, 1).text[0].clone();
+    assert!(row.trim().starts_with("1 S1  2 S2  "), "{row}");
+    assert!(row.contains("  0 S10  11 S11"), "{row}");
+    assert!(
+        [NavKeys::HEY, NavKeys::NONE]
+            .iter()
+            .all(|keys| !keys.zero_first)
+    );
 }
 
 #[test]

@@ -56,6 +56,23 @@ there. A digit past the last section is not taken either, unless
 `swallow_digits` is on: then it maps to `Action::Swallow`, and `apply`
 answers `Step::Swallowed`, so the key is taken and nothing moves.
 
+## Number from zero
+
+With `zero_first` on, `0` is the first section and `1` to `9` the second
+through the tenth, and the section labels show those digits. A section past
+the tenth gets no digit and no number on its label; `]`, `[` and the group
+keys still reach it.
+
+```rust
+use pito_header::{Action, Group, Key, Nav, NavKeys, Section};
+
+let nav = Nav::new(vec![
+    Group::new("Mail").section(Section::new("Inbox")).section(Section::new("Drafts")),
+]).keys(NavKeys::HEY.zero_first(true));
+assert_eq!(nav.action(Key::Char('0')), Some(Action::Go(1)));
+assert_eq!(nav.action(Key::Char('1')), Some(Action::Go(2)));
+```
+
 ## Choose your own keys
 
 Build a `NavKeys` from `HEY` or `NONE` with its const methods, and give it to

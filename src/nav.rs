@@ -179,6 +179,7 @@ pub struct NavKeys {
     pub back: &'static [Key],
     pub digits: bool,
     pub swallow_digits: bool,
+    pub zero_first: bool,
 }
 
 impl NavKeys {
@@ -190,6 +191,7 @@ impl NavKeys {
         back: &[Key::Esc, Key::Char('q')],
         digits: true,
         swallow_digits: false,
+        zero_first: false,
     };
 
     pub const NONE: NavKeys = NavKeys {
@@ -200,6 +202,7 @@ impl NavKeys {
         back: &[],
         digits: false,
         swallow_digits: false,
+        zero_first: false,
     };
 
     pub const fn next_group(mut self, keys: &'static [Key]) -> Self {
@@ -235,6 +238,20 @@ impl NavKeys {
     pub const fn swallow_digits(mut self, on: bool) -> Self {
         self.swallow_digits = on;
         self
+    }
+
+    pub const fn zero_first(mut self, on: bool) -> Self {
+        self.zero_first = on;
+        self
+    }
+
+    const fn shown(&self, number: usize) -> Option<usize> {
+        match number {
+            1..=10 if self.zero_first => Some(number - 1),
+            _ if self.zero_first => None,
+            10 => Some(0),
+            _ => Some(number),
+        }
     }
 }
 
@@ -469,9 +486,13 @@ impl Nav {
             Action::Back
         } else {
             match key {
-                Key::Char('0') if keys.digits => Action::Go(10),
-                Key::Char(digit @ '1'..='9') if keys.digits => {
-                    Action::Go(digit as usize - '0' as usize)
+                Key::Char(digit @ '0'..='9') if keys.digits => {
+                    let digit = digit as usize - '0' as usize;
+                    Action::Go(match digit {
+                        _ if keys.zero_first => digit + 1,
+                        0 => 10,
+                        _ => digit,
+                    })
                 }
                 _ => return None,
             }
@@ -553,10 +574,6 @@ struct Label<'a> {
 }
 
 impl Label<'_> {
-    fn shown(&self) -> Option<usize> {
-        self.number.map(|n| if n == 10 { 0 } else { n })
-    }
-
     fn empty(&self) -> bool {
         self.spans.is_empty() && self.text.is_empty()
     }
@@ -572,7 +589,7 @@ impl Label<'_> {
 
     fn width(&self) -> u16 {
         let number = self
-            .shown()
+            .number
             .map_or(0, |n| text::number_width(n) + u16::from(!self.empty()));
         number.saturating_add(2).saturating_add(self.body_width())
     }
@@ -580,7 +597,7 @@ impl Label<'_> {
     fn draw(&self, pen: &mut Pen, style: Style, underline: bool) {
         let mut digits = [0; 20];
         pen.put(" ", style);
-        if let Some(number) = self.shown() {
+        if let Some(number) = self.number {
             let number_style = if underline {
                 style.add_modifier(Modifier::UNDERLINED)
             } else {
@@ -744,6 +761,7 @@ impl<'a> NavBar<'a> {
     fn section_labels(&self, form: Form) -> impl Iterator<Item = Label<'a>> + Clone {
         let place = self.nav.place();
         let offset = self.nav.offset(place.group);
+        let keys = self.nav.keys;
         self.nav
             .groups
             .get(place.group)
@@ -755,7 +773,7 @@ impl<'a> NavBar<'a> {
                 let on = index == place.section;
                 let (text, spans) = section_body(section, on, form);
                 Label {
-                    number: Some(offset + index + 1),
+                    number: keys.shown(offset + index + 1),
                     text,
                     spans,
                     on,

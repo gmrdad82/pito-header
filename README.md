@@ -180,6 +180,11 @@ always draws the same cells. Run `cargo run --release --example bench
   unless `swallow_digits` is on: then they map to `Action::Swallow`, which
   `apply` answers with `Step::Swallowed`, so the key is taken and nothing
   moves. Off by default, and only while `digits` is on.
+- **`zero_first`** numbers the sections from `0`: `0` jumps to the first,
+  `1` to `9` to the second through the tenth, and the labels show the same
+  digits. Sections past the tenth have no digit and no number on their
+  label; `]`, `[` and the group keys still reach them. Off by default, when
+  `0` is the tenth.
 - **`cycle(by)` and `step(by)`** move by the size of `by` (negative goes
   back) and wrap. `cycle` counts filled groups only and answers `None` when
   there is no other group to go to; `cycle(0)` and `step(0)` stay where they
@@ -229,10 +234,10 @@ Nav::new(groups).keys(NavKeys)
 pub enum Action { NextGroup, PrevGroup, NextSection, PrevSection, Go(usize), Back, Swallow }   // non_exhaustive
 pub enum Step { Moved(Place), Back { selected }, Swallowed }                                   // non_exhaustive
 NavKeys { next_group, prev_group, next_section, prev_section, back: &'static [Key], digits,
-          swallow_digits }                             // non_exhaustive; digits past the last section are taken
+          swallow_digits, zero_first }                 // non_exhaustive; digits past the last section are taken
   NavKeys::HEY: tab / backtab, ] / [, digits, esc / q          NavKeys::NONE
   .next_group(..) .prev_group(..) .next_section(..) .prev_section(..) .back(..)   // const builders
-  .digits(bool) .swallow_digits(bool)
+  .digits(bool) .swallow_digits(bool) .zero_first(bool)
 NavBar::new(&nav).styles(..).lit(bool).groups(bool).underline(bool); height(), hit(..)
 Breadcrumb::new(&nav).styles(..).centred(bool)
 Fact::new(text, style)

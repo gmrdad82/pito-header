@@ -33,10 +33,10 @@ Nav::new(groups).keys(NavKeys)
 pub enum Action { NextGroup, PrevGroup, NextSection, PrevSection, Go(usize), Back, Swallow }   // non_exhaustive
 pub enum Step { Moved(Place), Back { selected }, Swallowed }                                   // non_exhaustive
 NavKeys { next_group, prev_group, next_section, prev_section, back: &'static [Key], digits,
-          swallow_digits }                             // non_exhaustive
+          swallow_digits, zero_first }                 // non_exhaustive
   NavKeys::HEY (the default), NavKeys::NONE
   .next_group(..) .prev_group(..) .next_section(..) .prev_section(..) .back(..)   // const builders
-  .digits(bool) .swallow_digits(bool)
+  .digits(bool) .swallow_digits(bool) .zero_first(bool)
 NavBar::new(&nav).styles(..).lit(bool).groups(bool).underline(bool); height(), hit(..)
 Breadcrumb::new(&nav).styles(..).centred(bool)
 Fact::new(text, style)
