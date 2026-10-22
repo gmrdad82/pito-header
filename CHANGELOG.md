@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.1 — 2026-10-22
+
+### Fixed
+
+- Section and crumb names whose letters join, such as Arabic lam-alef, are measured the way ratatui draws them. Before, the breadcrumb could keep a trail that didn't fit and show a stray ellipsis, and a click on the nav bar could land on the wrong section. Plain ASCII names draw and measure as before, just as fast.
+
+### Changed
+
+- The tests now reach every reachable line of the crate: 99.8% of lines and every function, up from 95.2% and 94.3%.
+
 ## v1.1.0 — 2026-10-21
 
 ### Added
