@@ -14,7 +14,20 @@ fn pieces(text: &str) -> impl Iterator<Item = &str> {
 }
 
 fn cells(text: &str) -> u16 {
-    u16::try_from(text.width()).unwrap_or(u16::MAX)
+    if text.is_ascii() {
+        return u16::try_from(text.len()).unwrap_or(u16::MAX);
+    }
+    let wide = text
+        .graphemes(true)
+        .map(|grapheme| {
+            grapheme.width()
+                + grapheme
+                    .chars()
+                    .filter(|c| matches!(c, '\u{FF9E}' | '\u{FF9F}'))
+                    .count()
+        })
+        .fold(0usize, usize::saturating_add);
+    u16::try_from(wide).unwrap_or(u16::MAX)
 }
 
 pub(crate) fn width(text: &str) -> u16 {

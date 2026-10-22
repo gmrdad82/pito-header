@@ -430,3 +430,207 @@ fn huge_text_never_overflows_a_width() {
     nav.open(wide, 0);
     let _ = draw(Breadcrumb::new(&nav).centred(true), 60, 1);
 }
+
+fn hollow() -> Nav {
+    Nav::new(vec![Group::new("Empty"), Group::new("Hollow")])
+}
+
+fn blank(buf: &ratatui::buffer::Buffer) -> bool {
+    *buf == ratatui::buffer::Buffer::empty(buf.area)
+}
+
+#[test]
+fn a_bar_without_its_groups_row_puts_the_sections_on_top() {
+    let nav = nav();
+    let both = NavBar::new(&nav).styles(STYLES);
+    let alone = both.groups(false);
+    assert_eq!(both.height(), 2);
+    assert_eq!(alone.height(), 1);
+    let full = draw(both, 60, 2);
+    for height in [1, 2, 3] {
+        let drawn = draw(alone, 60, height);
+        assert_eq!(drawn.text[0], full.text[1], "{height}");
+        assert_eq!(drawn.marks[0], full.marks[1], "{height}");
+        assert!(drawn.text[1..].iter().all(String::is_empty), "{height}");
+    }
+    assert_eq!(full.text[1].trim(), "1 Inbox  2 Drafts  3 Archive");
+    let area = Rect::new(0, 0, 60, 2);
+    let x = full.text[1].find("2 Drafts").unwrap() as u16;
+    let drafts = Some(Place {
+        group: 0,
+        section: 1,
+        number: 2,
+    });
+    assert_eq!(alone.hit(area, x, 0), drafts);
+    assert_eq!(alone.hit(area, x, 1), None);
+    assert_eq!(both.hit(area, x, 1), drafts);
+}
+
+#[test]
+fn groups_can_be_forced_on_for_a_single_group() {
+    let nav = lone();
+    let bar = NavBar::new(&nav).styles(STYLES);
+    assert_eq!(bar.height(), 1);
+    assert_eq!(bar.groups(true).height(), 2);
+    let drawn = draw(bar.groups(true), 20, 2);
+    assert_eq!(drawn.text, ["         A", "      1 Checks"]);
+    assert_eq!(drawn.marks, ["        AAA", "     AAAAAAAAAA"]);
+}
+
+#[test]
+fn a_bar_of_empty_groups_draws_the_groups_row_alone() {
+    let nav = hollow();
+    let bar = NavBar::new(&nav).styles(STYLES);
+    assert_eq!(bar.height(), 1);
+    for height in [1, 2] {
+        let drawn = draw(bar, 30, height);
+        assert_eq!(drawn.text[0], "       Empty    Hollow", "{height}");
+        assert_eq!(drawn.marks[0], "      AAAAAAA  mmmmmmmm", "{height}");
+        assert!(drawn.text[1..].iter().all(String::is_empty), "{height}");
+    }
+    assert_eq!(bar.hit(Rect::new(0, 0, 30, 2), 9, 0), None);
+    assert_eq!(bar.hit(Rect::new(0, 0, 30, 2), 9, 1), None);
+}
+
+#[test]
+fn a_bar_with_neither_row_draws_nothing() {
+    let nav = hollow();
+    let bar = NavBar::new(&nav).styles(STYLES).groups(false);
+    assert_eq!(bar.height(), 0);
+    for height in [1, 2, 3] {
+        let drawn = draw(bar, 30, height);
+        assert!(drawn.text.iter().all(String::is_empty), "{height}");
+    }
+    assert_eq!(bar.hit(Rect::new(0, 0, 30, 2), 9, 0), None);
+    let empty = Nav::new(Vec::new());
+    let bar = NavBar::new(&empty).styles(STYLES);
+    assert_eq!(bar.height(), 0);
+    assert!(draw(bar, 30, 2).text.iter().all(String::is_empty));
+}
+
+#[test]
+fn a_bar_with_no_height_or_width_draws_nothing() {
+    let nav = nav();
+    for bar in [
+        NavBar::new(&nav).styles(STYLES),
+        NavBar::new(&nav).styles(STYLES).groups(false),
+    ] {
+        for area in [Rect::new(0, 0, 40, 0), Rect::new(0, 0, 0, 2)] {
+            let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 40, 2));
+            ratatui::widgets::Widget::render(bar, area, &mut buf);
+            assert!(blank(&buf), "{area:?}");
+            assert_eq!(bar.hit(area, 0, 0), None, "{area:?}");
+        }
+    }
+}
+
+const LAM_ALEF: &str = "\u{644}\u{627}\u{644}\u{627}\u{644}\u{627}";
+const KANA: &str = "\u{FF8A}\u{FF9E}\u{FF8A}\u{FF9E}";
+
+fn drilled(name: &'static str) -> Nav {
+    let mut nav = Nav::new(vec![Group::new("G").section(Section::new(name))]);
+    nav.open("abc", 0);
+    nav
+}
+
+fn drawn_crumb(nav: &Nav, width: u16) -> (String, String) {
+    let mut drawn = draw(Breadcrumb::new(nav).styles(STYLES), width, 1);
+    (drawn.text.remove(0), drawn.marks.remove(0))
+}
+
+#[test]
+fn a_crumb_whose_letters_join_is_measured_as_it_is_drawn() {
+    let nav = drilled(LAM_ALEF);
+    let whole = format!("─ {LAM_ALEF} / abc ─");
+    assert_eq!(drawn_crumb(&nav, 16), (whole, "rrAAAAAAAAAAAArr".into()));
+    for width in [13, 14, 15] {
+        let (text, marks) = drawn_crumb(&nav, width);
+        assert!(text.starts_with("─ … / abc ─"), "{width} {text:?}");
+        assert!(!text.contains(LAM_ALEF), "{width} {text:?}");
+        assert_eq!(
+            marks,
+            format!("rrAAAAAAAr{}", "r".repeat(usize::from(width) - 10))
+        );
+    }
+}
+
+#[test]
+fn halfwidth_sound_marks_take_the_cell_the_terminal_gives_them() {
+    let nav = drilled(KANA);
+    let (text, marks) = drawn_crumb(&nav, 14);
+    assert!(text.contains("abc ─"), "{text:?}");
+    assert_eq!(marks.chars().count(), 14);
+    assert!(marks.ends_with("AAAAAArr"), "{marks:?}");
+    assert_eq!(drawn_crumb(&nav, 13).0, "─ … / abc ───");
+}
+
+#[test]
+fn a_click_lands_on_the_section_drawn_under_it_when_letters_join() {
+    let nav = Nav::new(vec![
+        Group::new("G")
+            .section(Section::new(LAM_ALEF))
+            .section(Section::new("Next")),
+    ]);
+    let bar = NavBar::new(&nav).styles(STYLES);
+    let drawn = draw(bar, 30, 1);
+    assert_eq!(drawn.marks[0], "      AAAAAAAAAAmmmmmmmm");
+    let area = Rect::new(0, 0, 30, 1);
+    let number = |x| bar.hit(area, x, 0).map(|place| place.number);
+    assert_eq!(number(5), None);
+    assert_eq!(number(6), Some(1));
+    assert_eq!(number(15), Some(1));
+    assert_eq!(number(16), Some(2));
+    assert_eq!(number(23), Some(2));
+    assert_eq!(number(24), None);
+}
+
+fn printable_ascii() -> String {
+    let mut text: String = ('!'..='~').collect();
+    text.insert(47, ' ');
+    text
+}
+
+#[test]
+fn every_printable_ascii_char_takes_the_one_cell_it_is_drawn_in() {
+    let text = printable_ascii();
+    assert_eq!(text.len(), 95);
+    let nav = lone();
+    let notice = |text: &str, width: u16| {
+        let header = Header::new(&nav)
+            .tabs(false)
+            .notice(Some(Fact::new(text, Style::new())));
+        draw(header, width, 1).text.remove(0)
+    };
+    assert_eq!(notice(&text, 95), text);
+    assert_eq!(notice(&text, 94), format!("{}…", &text[..93]));
+    let split = format!("{}\t{}", &text[..40], &text[40..]);
+    let spaced = format!("{} {}", &text[..40], &text[40..]);
+    assert_eq!(notice(&split, 96), spaced);
+    assert_eq!(notice(&split, 95), format!("{}…", &spaced[..94]));
+}
+
+#[test]
+fn a_click_lands_on_the_section_drawn_under_it_for_every_printable_ascii_char() {
+    let name: &'static str = printable_ascii().leak();
+    let nav = Nav::new(vec![
+        Group::new("G")
+            .section(Section::new(name))
+            .section(Section::new("Next")),
+    ]);
+    let bar = NavBar::new(&nav).styles(STYLES);
+    let drawn = draw(bar, 160, 1);
+    assert!(drawn.text[0].contains(name), "{:?}", drawn.text[0]);
+    let marks = &drawn.marks[0];
+    let start = marks.find('A').unwrap();
+    let next = marks.find('m').unwrap();
+    let end = marks.len();
+    assert_eq!(next - start, 95 + 4);
+    let area = Rect::new(0, 0, 160, 1);
+    let number = |x: usize| bar.hit(area, x as u16, 0).map(|place| place.number);
+    assert_eq!(number(start - 1), None);
+    assert_eq!(number(start), Some(1));
+    assert_eq!(number(next - 1), Some(1));
+    assert_eq!(number(next), Some(2));
+    assert_eq!(number(end - 1), Some(2));
+    assert_eq!(number(end), None);
+}
