@@ -209,3 +209,75 @@ fn the_breadcrumb_widget_centres_on_request() {
     assert_eq!(crumb(false), "─ Ownership / build queue ─────");
     assert_eq!(crumb(true), "─── Ownership / build queue ───");
 }
+
+fn crumb(nav: &Nav, centred: bool, width: u16) -> (String, String) {
+    let widget = Breadcrumb::new(nav).styles(STYLES).centred(centred);
+    let mut drawn = draw(widget, width, 1);
+    (drawn.text.remove(0), drawn.marks.remove(0))
+}
+
+#[test]
+fn a_lone_crumb_too_wide_for_the_rule_is_clipped_with_an_ellipsis() {
+    let nav = nav();
+    let cases = [
+        (10, "─ Inbox ──", "rrAAAAArrr"),
+        (9, "─ Inbox ─", "rrAAAAArr"),
+        (8, "─ Inb… ─", "rrAAAArr"),
+        (7, "─ In… ─", "rrAAArr"),
+        (6, "─ I… ─", "rrAArr"),
+        (5, "─ … ─", "rrArr"),
+        (4, "────", "rrrr"),
+        (1, "─", "r"),
+    ];
+    for (width, text, marks) in cases {
+        let (drawn, drawn_marks) = crumb(&nav, false, width);
+        assert_eq!(drawn, text, "{width}");
+        assert_eq!(drawn_marks, marks, "{width}");
+    }
+    for (width, text, marks) in &cases[1..] {
+        assert_eq!(
+            crumb(&nav, true, *width),
+            (text.to_string(), marks.to_string())
+        );
+    }
+}
+
+#[test]
+fn a_last_crumb_is_clipped_then_dropped_as_the_rule_narrows() {
+    let mut nav = nav();
+    nav.open("nightly", 0);
+    let cases = [
+        (19, "─ Inbox / nightly ─"),
+        (18, "─ … / nightly ────"),
+        (15, "─ … / nightly ─"),
+        (14, "─ … / night… ─"),
+        (10, "─ … / n… ─"),
+        (9, "─ … / … ─"),
+        (8, "─ … ────"),
+        (6, "─ … ──"),
+        (5, "─ … ─"),
+        (4, "────"),
+    ];
+    for (width, text) in cases {
+        assert_eq!(crumb(&nav, false, width).0, text, "{width}");
+    }
+    assert_eq!(crumb(&nav, false, 14).1, "rrAAAAAAAAAArr");
+    assert_eq!(crumb(&nav, false, 8).1, "rrArrrrr");
+    assert_eq!(crumb(&nav, true, 14), crumb(&nav, false, 14));
+    assert_eq!(crumb(&nav, true, 18).0, "── … / nightly ───");
+}
+
+#[test]
+fn a_breadcrumb_with_no_room_draws_nothing() {
+    let mut nav = nav();
+    nav.open("nightly", 0);
+    for area in [
+        Rect::new(0, 0, 0, 1),
+        Rect::new(0, 0, 20, 0),
+        Rect::new(40, 0, 20, 1),
+    ] {
+        let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 20, 1));
+        ratatui::widgets::Widget::render(Breadcrumb::new(&nav).styles(STYLES), area, &mut buf);
+        assert_eq!(buf, ratatui::buffer::Buffer::empty(buf.area), "{area:?}");
+    }
+}

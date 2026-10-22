@@ -489,3 +489,114 @@ fn drawing_stays_inside_its_area() {
         }
     }
 }
+
+fn marks_of(drawn: &common::Drawn, row: usize, text: &str) -> String {
+    let line = &drawn.text[row];
+    let at = line
+        .find(text)
+        .unwrap_or_else(|| panic!("{text:?} in {line:?}"));
+    let start = line[..at].chars().count();
+    drawn.marks[row]
+        .chars()
+        .skip(start)
+        .take(text.chars().count())
+        .collect()
+}
+
+#[test]
+fn an_unlit_header_dims_the_current_section_but_keeps_the_group_lit() {
+    let nav = nav();
+    let lit = draw(Header::new(&nav).styles(STYLES), 60, 2);
+    let unlit = draw(Header::new(&nav).styles(STYLES).lit(false), 60, 2);
+    assert_eq!(lit.text, unlit.text);
+    assert_eq!(marks_of(&lit, 1, "1 Inbox"), "AAAAAAA");
+    assert_eq!(marks_of(&unlit, 1, "1 Inbox"), "mmmmmmm");
+    assert_eq!(marks_of(&unlit, 1, "2 Drafts"), "mmmmmmmm");
+    assert_eq!(marks_of(&unlit, 0, "Mail"), "AAAA");
+    assert_eq!(marks_of(&unlit, 0, "Library"), "mmmmmmm");
+    let header = Header::new(&nav).styles(STYLES).lit(false).lit(true);
+    assert_eq!(draw(header, 60, 2).marks, lit.marks);
+}
+
+#[test]
+fn an_unlit_header_still_lights_the_breadcrumb_when_drilled_in() {
+    let mut nav = nav();
+    nav.open("nightly", 0);
+    let drawn = draw(Header::new(&nav).styles(STYLES).lit(false), 40, 2);
+    assert_eq!(marks_of(&drawn, 1, "Inbox / nightly"), "A".repeat(15));
+    assert_eq!(marks_of(&drawn, 0, "Mail"), "AAAA");
+}
+
+#[test]
+fn a_facts_row_outside_the_buffer_or_with_no_width_draws_nothing() {
+    let nav = nav();
+    let facts = [Fact::new("12 checks", GREEN)];
+    for rule in [false, true] {
+        let header = Header::new(&nav)
+            .styles(STYLES)
+            .tabs(false)
+            .facts(&facts)
+            .facts_rule(rule);
+        assert_eq!(header.height(), 1);
+        for area in [
+            Rect::new(0, 0, 0, 1),
+            Rect::new(30, 0, 10, 1),
+            Rect::new(0, 4, 20, 1),
+        ] {
+            let mut buf = Buffer::empty(Rect::new(0, 0, 20, 1));
+            header.render(area, &mut buf);
+            assert_eq!(buf, Buffer::empty(buf.area), "{rule} {area:?}");
+        }
+        let drawn = draw(header, 20, 1);
+        assert_eq!(
+            drawn.text[0].trim_matches(['─', ' ']),
+            "12 checks",
+            "{rule}"
+        );
+    }
+}
+
+#[test]
+fn empty_side_parts_draw_the_title_row_as_if_there_were_none() {
+    let nav = nav();
+    let none: [Fact; 0] = [];
+    let blank = [Fact::new("", GREEN), Fact::new("", RED)];
+    let pairs: [(String, Style); 1] = [(String::new(), GREEN)];
+    let titled = || {
+        Header::new(&nav)
+            .styles(STYLES)
+            .title(Some("Desk"))
+            .tabs(false)
+    };
+    let plain = draw(titled(), 40, 1);
+    assert_eq!(plain.text[0], "───────────────── Desk ─────────────────");
+    for header in [
+        titled().left_parts(&none).right_parts(&none),
+        titled().left_parts(&blank).right_parts(&blank),
+        titled().left_pairs(&pairs).right_pairs(&pairs),
+        titled()
+            .left(Some(Fact::new("", GREEN)))
+            .right(Some(Fact::new("", GREEN))),
+    ] {
+        let drawn = draw(header, 40, 1);
+        assert_eq!(drawn.text, plain.text);
+        assert_eq!(drawn.marks, plain.marks);
+    }
+}
+
+#[test]
+fn a_notice_with_a_line_break_clips_where_the_break_meets_the_edge() {
+    let nav = nav();
+    let notice = |width: u16| {
+        let header = Header::new(&nav)
+            .tabs(false)
+            .notice(Some(Fact::new("ab\ncd", RED)));
+        draw(header, width, 1).text.remove(0)
+    };
+    assert_eq!(notice(6), "ab cd");
+    assert_eq!(notice(5), "ab cd");
+    assert_eq!(notice(4), "ab …");
+    assert_eq!(notice(3), "ab…");
+    assert_eq!(notice(2), "a…");
+    assert_eq!(notice(1), "…");
+}

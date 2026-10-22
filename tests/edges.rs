@@ -430,3 +430,96 @@ fn huge_text_never_overflows_a_width() {
     nav.open(wide, 0);
     let _ = draw(Breadcrumb::new(&nav).centred(true), 60, 1);
 }
+
+fn hollow() -> Nav {
+    Nav::new(vec![Group::new("Empty"), Group::new("Hollow")])
+}
+
+fn blank(buf: &ratatui::buffer::Buffer) -> bool {
+    *buf == ratatui::buffer::Buffer::empty(buf.area)
+}
+
+#[test]
+fn a_bar_without_its_groups_row_puts_the_sections_on_top() {
+    let nav = nav();
+    let both = NavBar::new(&nav).styles(STYLES);
+    let alone = both.groups(false);
+    assert_eq!(both.height(), 2);
+    assert_eq!(alone.height(), 1);
+    let full = draw(both, 60, 2);
+    for height in [1, 2, 3] {
+        let drawn = draw(alone, 60, height);
+        assert_eq!(drawn.text[0], full.text[1], "{height}");
+        assert_eq!(drawn.marks[0], full.marks[1], "{height}");
+        assert!(drawn.text[1..].iter().all(String::is_empty), "{height}");
+    }
+    assert_eq!(full.text[1].trim(), "1 Inbox  2 Drafts  3 Archive");
+    let area = Rect::new(0, 0, 60, 2);
+    let x = full.text[1].find("2 Drafts").unwrap() as u16;
+    let drafts = Some(Place {
+        group: 0,
+        section: 1,
+        number: 2,
+    });
+    assert_eq!(alone.hit(area, x, 0), drafts);
+    assert_eq!(alone.hit(area, x, 1), None);
+    assert_eq!(both.hit(area, x, 1), drafts);
+}
+
+#[test]
+fn groups_can_be_forced_on_for_a_single_group() {
+    let nav = lone();
+    let bar = NavBar::new(&nav).styles(STYLES);
+    assert_eq!(bar.height(), 1);
+    assert_eq!(bar.groups(true).height(), 2);
+    let drawn = draw(bar.groups(true), 20, 2);
+    assert_eq!(drawn.text, ["         A", "      1 Checks"]);
+    assert_eq!(drawn.marks, ["        AAA", "     AAAAAAAAAA"]);
+}
+
+#[test]
+fn a_bar_of_empty_groups_draws_the_groups_row_alone() {
+    let nav = hollow();
+    let bar = NavBar::new(&nav).styles(STYLES);
+    assert_eq!(bar.height(), 1);
+    for height in [1, 2] {
+        let drawn = draw(bar, 30, height);
+        assert_eq!(drawn.text[0], "       Empty    Hollow", "{height}");
+        assert_eq!(drawn.marks[0], "      AAAAAAA  mmmmmmmm", "{height}");
+        assert!(drawn.text[1..].iter().all(String::is_empty), "{height}");
+    }
+    assert_eq!(bar.hit(Rect::new(0, 0, 30, 2), 9, 0), None);
+    assert_eq!(bar.hit(Rect::new(0, 0, 30, 2), 9, 1), None);
+}
+
+#[test]
+fn a_bar_with_neither_row_draws_nothing() {
+    let nav = hollow();
+    let bar = NavBar::new(&nav).styles(STYLES).groups(false);
+    assert_eq!(bar.height(), 0);
+    for height in [1, 2, 3] {
+        let drawn = draw(bar, 30, height);
+        assert!(drawn.text.iter().all(String::is_empty), "{height}");
+    }
+    assert_eq!(bar.hit(Rect::new(0, 0, 30, 2), 9, 0), None);
+    let empty = Nav::new(Vec::new());
+    let bar = NavBar::new(&empty).styles(STYLES);
+    assert_eq!(bar.height(), 0);
+    assert!(draw(bar, 30, 2).text.iter().all(String::is_empty));
+}
+
+#[test]
+fn a_bar_with_no_height_or_width_draws_nothing() {
+    let nav = nav();
+    for bar in [
+        NavBar::new(&nav).styles(STYLES),
+        NavBar::new(&nav).styles(STYLES).groups(false),
+    ] {
+        for area in [Rect::new(0, 0, 40, 0), Rect::new(0, 0, 0, 2)] {
+            let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 40, 2));
+            ratatui::widgets::Widget::render(bar, area, &mut buf);
+            assert!(blank(&buf), "{area:?}");
+            assert_eq!(bar.hit(area, 0, 0), None, "{area:?}");
+        }
+    }
+}

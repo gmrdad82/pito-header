@@ -1,7 +1,7 @@
 mod common;
 
 use common::{STYLES, draw, nav};
-use pito_header::{Action, Group, Key, Nav, NavBar, NavKeys, Place, Section, Step};
+use pito_header::{Action, Breadcrumb, Group, Key, Nav, NavBar, NavKeys, Place, Section, Step};
 
 fn place(group: usize, section: usize, number: usize) -> Place {
     Place {
@@ -283,4 +283,168 @@ fn crossterm_keys_convert() {
     let mut release = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
     release.kind = KeyEventKind::Release;
     assert_eq!(Key::from(release), Key::Other);
+}
+
+fn built(base: NavKeys) -> NavKeys {
+    std::hint::black_box(base)
+}
+
+#[test]
+fn each_key_builder_replaces_its_own_keys_at_run_time() {
+    let mut keyed = nav().keys(built(NavKeys::HEY).next_group(&[Key::Right]));
+    assert_eq!(keyed.action(Key::Tab), None);
+    assert_eq!(keyed.key(Key::Right), Some(Step::Moved(place(1, 0, 4))));
+    assert_eq!(keyed.key(Key::BackTab), Some(Step::Moved(place(0, 0, 1))));
+
+    let mut keyed = nav().keys(built(NavKeys::HEY).prev_group(&[Key::Left]));
+    assert_eq!(keyed.action(Key::BackTab), None);
+    assert_eq!(keyed.key(Key::Left), Some(Step::Moved(place(2, 0, 7))));
+    assert_eq!(keyed.key(Key::Tab), Some(Step::Moved(place(0, 0, 1))));
+
+    let mut keyed = nav().keys(built(NavKeys::HEY).next_section(&[Key::Down]));
+    assert_eq!(keyed.action(Key::Char(']')), None);
+    assert_eq!(keyed.key(Key::Down), Some(Step::Moved(place(0, 1, 2))));
+    assert_eq!(keyed.key(Key::Char('[')), Some(Step::Moved(place(0, 0, 1))));
+
+    let mut keyed = nav().keys(built(NavKeys::HEY).prev_section(&[Key::Up]));
+    assert_eq!(keyed.action(Key::Char('[')), None);
+    assert_eq!(keyed.key(Key::Up), Some(Step::Moved(place(0, 2, 3))));
+    assert_eq!(keyed.key(Key::Char(']')), Some(Step::Moved(place(0, 0, 1))));
+
+    let mut keyed = nav().keys(built(NavKeys::HEY).back(&[Key::Backspace]));
+    keyed.open("detail", 5);
+    assert_eq!(keyed.action(Key::Esc), None);
+    assert_eq!(keyed.action(Key::Char('q')), None);
+    assert_eq!(keyed.key(Key::Backspace), Some(Step::Back { selected: 5 }));
+    assert_eq!(keyed.action(Key::Backspace), None);
+}
+
+#[test]
+fn builders_on_no_keys_bind_only_what_they_name() {
+    let keys = built(NavKeys::NONE)
+        .next_group(&[Key::Char('l')])
+        .prev_group(&[Key::Char('h')])
+        .next_section(&[Key::Char('j')])
+        .prev_section(&[Key::Char('k')])
+        .back(&[Key::Ctrl('o')]);
+    let mut nav = nav().keys(keys);
+    for unbound in [
+        Key::Tab,
+        Key::BackTab,
+        Key::Char(']'),
+        Key::Char('['),
+        Key::Char('2'),
+        Key::Esc,
+        Key::Char('L'),
+        Key::Alt('l'),
+    ] {
+        assert_eq!(nav.action(unbound), None, "{unbound:?}");
+    }
+    assert_eq!(nav.action(Key::Char('l')), Some(Action::NextGroup));
+    assert_eq!(nav.action(Key::Char('h')), Some(Action::PrevGroup));
+    assert_eq!(nav.action(Key::Char('j')), Some(Action::NextSection));
+    assert_eq!(nav.action(Key::Char('k')), Some(Action::PrevSection));
+    assert_eq!(nav.action(Key::Ctrl('o')), None);
+    nav.open("detail", 2);
+    assert_eq!(nav.key(Key::Ctrl('o')), Some(Step::Back { selected: 2 }));
+}
+
+#[test]
+fn a_key_bound_twice_takes_the_first_meaning() {
+    let keys = built(NavKeys::NONE)
+        .next_group(&[Key::Enter])
+        .back(&[Key::Enter]);
+    let mut nav = nav().keys(keys);
+    nav.open("detail", 0);
+    assert_eq!(nav.action(Key::Enter), Some(Action::NextGroup));
+    assert_eq!(nav.key(Key::Enter), Some(Step::Moved(place(1, 0, 4))));
+}
+
+#[test]
+fn go_refuses_zero_and_numbers_past_the_count() {
+    let mut nav = nav();
+    nav.go(5);
+    for number in [0, 10, 11, usize::MAX] {
+        assert_eq!(nav.go(number), None, "{number}");
+        assert_eq!(nav.apply(Action::Go(number)), None, "{number}");
+        assert_eq!(nav.place(), place(1, 1, 5), "{number}");
+    }
+    assert_eq!(nav.go(9), Some(place(2, 2, 9)));
+    assert_eq!(nav.go(1), Some(place(0, 0, 1)));
+}
+
+#[test]
+fn go_skips_empty_groups_by_number() {
+    let mut nav = Nav::new(vec![
+        Group::new("Empty"),
+        Group::new("One").section(Section::new("A")),
+        Group::new("Hollow"),
+        Group::new("Two")
+            .section(Section::new("B"))
+            .section(Section::new("C")),
+    ]);
+    assert_eq!(nav.place(), place(1, 0, 1));
+    assert_eq!(nav.go(2), Some(place(3, 0, 2)));
+    assert_eq!(nav.go(3), Some(place(3, 1, 3)));
+    assert_eq!(nav.go(4), None);
+    assert_eq!(nav.place(), place(3, 1, 3));
+}
+
+#[test]
+fn stepping_a_nav_whose_groups_are_all_empty_moves_nowhere() {
+    let mut nav = Nav::new(vec![Group::new("Empty"), Group::new("Hollow")]);
+    assert_eq!(nav.place(), place(0, 0, 0));
+    for action in [
+        Action::NextSection,
+        Action::PrevSection,
+        Action::NextGroup,
+        Action::PrevGroup,
+        Action::Go(1),
+        Action::Back,
+    ] {
+        assert_eq!(nav.apply(action), None, "{action:?}");
+    }
+    assert_eq!(nav.apply(Action::Swallow), Some(Step::Swallowed));
+    assert_eq!(nav.step(1), None);
+    assert_eq!(nav.place(), place(0, 0, 0));
+    let mut none = Nav::new(Vec::new());
+    assert_eq!(none.apply(Action::NextSection), None);
+    assert_eq!(none.step(-1), None);
+}
+
+#[test]
+fn the_nav_lends_its_groups_and_sections_as_built() {
+    let nav = nav();
+    let groups = nav.groups();
+    assert_eq!(groups.len(), 3);
+    let names: Vec<_> = groups.iter().map(Group::name).collect();
+    assert_eq!(names, ["Mail", "Library", "Work"]);
+    let shorts: Vec<_> = groups.iter().map(Group::short_name).collect();
+    assert_eq!(shorts, ["Mail", "Library", "Jobs"]);
+    let library: Vec<_> = groups[1]
+        .sections()
+        .iter()
+        .map(Section::short_name)
+        .collect();
+    assert_eq!(library, ["Items", "Sets", "Owners"]);
+    assert_eq!(groups[2].sections()[0].name(), "Imports & exports");
+    assert!(Group::new("Empty").sections().is_empty());
+    assert!(Nav::new(Vec::new()).groups().is_empty());
+}
+
+#[test]
+fn the_nav_bar_and_breadcrumb_bar_shortcuts_draw_what_the_widgets_draw() {
+    let mut nav = nav();
+    nav.go(5);
+    nav.open("nightly", 1);
+    let short = draw(nav.bar().styles(STYLES), 60, 2);
+    let long = draw(NavBar::new(&nav).styles(STYLES), 60, 2);
+    assert_eq!(short.text, long.text);
+    assert_eq!(short.marks, long.marks);
+    assert!(short.text[1].contains("5 Collections"), "{:?}", short.text);
+    let short = draw(nav.breadcrumb_bar().styles(STYLES), 40, 1);
+    let long = draw(Breadcrumb::new(&nav).styles(STYLES), 40, 1);
+    assert_eq!(short.text, long.text);
+    assert_eq!(short.marks, long.marks);
+    assert_eq!(short.text[0], "─ Collections / nightly ────────────────");
 }
