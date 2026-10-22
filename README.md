@@ -37,7 +37,7 @@ line works on Linux, Windows and macOS:
 
 ```sh
 cargo add ratatui
-cargo add pito-header --git https://github.com/gmrdad82/pito-header --tag v1.1.1
+cargo add pito-header --git https://github.com/gmrdad82/pito-header --tag v1.1.2
 ```
 
 Then build a nav, feed it keys and draw it:
