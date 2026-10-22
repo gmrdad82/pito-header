@@ -583,3 +583,54 @@ fn a_click_lands_on_the_section_drawn_under_it_when_letters_join() {
     assert_eq!(number(23), Some(2));
     assert_eq!(number(24), None);
 }
+
+fn printable_ascii() -> String {
+    let mut text: String = ('!'..='~').collect();
+    text.insert(47, ' ');
+    text
+}
+
+#[test]
+fn every_printable_ascii_char_takes_the_one_cell_it_is_drawn_in() {
+    let text = printable_ascii();
+    assert_eq!(text.len(), 95);
+    let nav = lone();
+    let notice = |text: &str, width: u16| {
+        let header = Header::new(&nav)
+            .tabs(false)
+            .notice(Some(Fact::new(text, Style::new())));
+        draw(header, width, 1).text.remove(0)
+    };
+    assert_eq!(notice(&text, 95), text);
+    assert_eq!(notice(&text, 94), format!("{}…", &text[..93]));
+    let split = format!("{}\t{}", &text[..40], &text[40..]);
+    let spaced = format!("{} {}", &text[..40], &text[40..]);
+    assert_eq!(notice(&split, 96), spaced);
+    assert_eq!(notice(&split, 95), format!("{}…", &spaced[..94]));
+}
+
+#[test]
+fn a_click_lands_on_the_section_drawn_under_it_for_every_printable_ascii_char() {
+    let name: &'static str = printable_ascii().leak();
+    let nav = Nav::new(vec![
+        Group::new("G")
+            .section(Section::new(name))
+            .section(Section::new("Next")),
+    ]);
+    let bar = NavBar::new(&nav).styles(STYLES);
+    let drawn = draw(bar, 160, 1);
+    assert!(drawn.text[0].contains(name), "{:?}", drawn.text[0]);
+    let marks = &drawn.marks[0];
+    let start = marks.find('A').unwrap();
+    let next = marks.find('m').unwrap();
+    let end = marks.len();
+    assert_eq!(next - start, 95 + 4);
+    let area = Rect::new(0, 0, 160, 1);
+    let number = |x: usize| bar.hit(area, x as u16, 0).map(|place| place.number);
+    assert_eq!(number(start - 1), None);
+    assert_eq!(number(start), Some(1));
+    assert_eq!(number(next - 1), Some(1));
+    assert_eq!(number(next), Some(2));
+    assert_eq!(number(end - 1), Some(2));
+    assert_eq!(number(end), None);
+}

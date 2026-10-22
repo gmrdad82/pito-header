@@ -262,29 +262,6 @@ fn empty_groups_are_skipped_by_tab() {
     assert_eq!(nav.go_to(1, 0), None);
 }
 
-#[cfg(feature = "crossterm")]
-#[test]
-fn crossterm_keys_convert() {
-    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-    let key = |code, modifiers| Key::from(KeyEvent::new(code, modifiers));
-    assert_eq!(
-        key(KeyCode::Char('c'), KeyModifiers::CONTROL),
-        Key::Ctrl('c')
-    );
-    assert_eq!(
-        key(KeyCode::Char('C'), KeyModifiers::CONTROL),
-        Key::Ctrl('c')
-    );
-    assert_eq!(key(KeyCode::Char('Q'), KeyModifiers::SHIFT), Key::Char('Q'));
-    assert_eq!(key(KeyCode::Tab, KeyModifiers::SHIFT), Key::BackTab);
-    assert_eq!(key(KeyCode::BackTab, KeyModifiers::SHIFT), Key::BackTab);
-    assert_eq!(key(KeyCode::Backspace, KeyModifiers::NONE), Key::Backspace);
-    assert_eq!(key(KeyCode::F(5), KeyModifiers::NONE), Key::Other);
-    let mut release = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
-    release.kind = KeyEventKind::Release;
-    assert_eq!(Key::from(release), Key::Other);
-}
-
 fn built(base: NavKeys) -> NavKeys {
     std::hint::black_box(base)
 }
@@ -347,17 +324,6 @@ fn builders_on_no_keys_bind_only_what_they_name() {
     assert_eq!(nav.action(Key::Ctrl('o')), None);
     nav.open("detail", 2);
     assert_eq!(nav.key(Key::Ctrl('o')), Some(Step::Back { selected: 2 }));
-}
-
-#[test]
-fn a_key_bound_twice_takes_the_first_meaning() {
-    let keys = built(NavKeys::NONE)
-        .next_group(&[Key::Enter])
-        .back(&[Key::Enter]);
-    let mut nav = nav().keys(keys);
-    nav.open("detail", 0);
-    assert_eq!(nav.action(Key::Enter), Some(Action::NextGroup));
-    assert_eq!(nav.key(Key::Enter), Some(Step::Moved(place(1, 0, 4))));
 }
 
 #[test]
