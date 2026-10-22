@@ -523,3 +523,63 @@ fn a_bar_with_no_height_or_width_draws_nothing() {
         }
     }
 }
+
+const LAM_ALEF: &str = "\u{644}\u{627}\u{644}\u{627}\u{644}\u{627}";
+const KANA: &str = "\u{FF8A}\u{FF9E}\u{FF8A}\u{FF9E}";
+
+fn drilled(name: &'static str) -> Nav {
+    let mut nav = Nav::new(vec![Group::new("G").section(Section::new(name))]);
+    nav.open("abc", 0);
+    nav
+}
+
+fn drawn_crumb(nav: &Nav, width: u16) -> (String, String) {
+    let mut drawn = draw(Breadcrumb::new(nav).styles(STYLES), width, 1);
+    (drawn.text.remove(0), drawn.marks.remove(0))
+}
+
+#[test]
+fn a_crumb_whose_letters_join_is_measured_as_it_is_drawn() {
+    let nav = drilled(LAM_ALEF);
+    let whole = format!("─ {LAM_ALEF} / abc ─");
+    assert_eq!(drawn_crumb(&nav, 16), (whole, "rrAAAAAAAAAAAArr".into()));
+    for width in [13, 14, 15] {
+        let (text, marks) = drawn_crumb(&nav, width);
+        assert!(text.starts_with("─ … / abc ─"), "{width} {text:?}");
+        assert!(!text.contains(LAM_ALEF), "{width} {text:?}");
+        assert_eq!(
+            marks,
+            format!("rrAAAAAAAr{}", "r".repeat(usize::from(width) - 10))
+        );
+    }
+}
+
+#[test]
+fn halfwidth_sound_marks_take_the_cell_the_terminal_gives_them() {
+    let nav = drilled(KANA);
+    let (text, marks) = drawn_crumb(&nav, 14);
+    assert!(text.contains("abc ─"), "{text:?}");
+    assert_eq!(marks.chars().count(), 14);
+    assert!(marks.ends_with("AAAAAArr"), "{marks:?}");
+    assert_eq!(drawn_crumb(&nav, 13).0, "─ … / abc ───");
+}
+
+#[test]
+fn a_click_lands_on_the_section_drawn_under_it_when_letters_join() {
+    let nav = Nav::new(vec![
+        Group::new("G")
+            .section(Section::new(LAM_ALEF))
+            .section(Section::new("Next")),
+    ]);
+    let bar = NavBar::new(&nav).styles(STYLES);
+    let drawn = draw(bar, 30, 1);
+    assert_eq!(drawn.marks[0], "      AAAAAAAAAAmmmmmmmm");
+    let area = Rect::new(0, 0, 30, 1);
+    let number = |x| bar.hit(area, x, 0).map(|place| place.number);
+    assert_eq!(number(5), None);
+    assert_eq!(number(6), Some(1));
+    assert_eq!(number(15), Some(1));
+    assert_eq!(number(16), Some(2));
+    assert_eq!(number(23), Some(2));
+    assert_eq!(number(24), None);
+}
