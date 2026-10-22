@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.2 — 2026-10-23
+
+### Changed
+
+- pito-header now needs ratatui 0.30.2 or newer (and so Rust 1.88 or newer), so halfwidth sound marks (゙ ゚) take the same cell on screen that pito-header measures for them, and clicks on such names land on the right section.
+
 ## v1.1.1 — 2026-10-22
 
 ### Fixed
